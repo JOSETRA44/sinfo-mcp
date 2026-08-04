@@ -62,28 +62,78 @@ export function parseDurationToken(token: string): Duration {
   return duration;
 }
 
+/** Nombre de la figura en MusicXML y en la mayoria de formatos de partitura. */
+const NOTE_TYPE_NAMES: Readonly<Record<string, string>> = {
+  w: 'whole',
+  h: 'half',
+  q: 'quarter',
+  e: 'eighth',
+  s: '16th',
+  t: '32nd',
+  x: '64th',
+};
+
+export interface TupletShape {
+  /** Cuantas notas se tocan. 3 en un tresillo. */
+  readonly actual: number;
+  /** En el sitio de cuantas. 2 en un tresillo. */
+  readonly normal: number;
+}
+
 /**
- * Escribe una duracion como token de SinfoScript.
- *
- * Busca entre las combinaciones representables (figura x puntos x grupo
- * irregular). Devuelve null si la duracion no se puede escribir con la
- * notacion: quien llame decide si partirla en varias atadas o si es un error.
+ * Una duracion descompuesta en los tres datos que pide cualquier formato de
+ * partitura: que figura es, cuantos puntillos lleva y si va en grupo irregular.
  */
-export function formatDurationToken(duration: Duration): string | null {
+export interface DurationShape {
+  /** Letra de SinfoScript: w h q e s t x. */
+  readonly base: string;
+  /** Nombre de la figura: whole, half, quarter, eighth, 16th... */
+  readonly noteType: string;
+  readonly dots: number;
+  readonly tuplet: TupletShape | null;
+}
+
+/**
+ * Descompone una duracion en figura, puntillos y grupo irregular.
+ *
+ * MusicXML, LilyPond y ABC piden todos exactamente estos tres datos por
+ * separado: `<type>eighth</type>` mas `<dot/>` mas `<time-modification>`. Se
+ * calcula una sola vez aqui en vez de que cada exportador reinvente la
+ * busqueda y la equivoque de forma distinta.
+ *
+ * Devuelve null si la duracion no cabe en una sola figura; en ese caso hay que
+ * partirla con `splitIntoWritable`.
+ */
+export function analyzeDuration(duration: Duration): DurationShape | null {
   for (const base of BASE_ORDER) {
     const baseDuration = BASE_TOKENS[base]!;
     for (let dots = 0; dots <= 2; dots++) {
       const dotted = baseDuration.dotted(dots);
-      if (dotted.equals(duration)) return `${base}${'.'.repeat(dots)}`;
+      if (dotted.equals(duration)) {
+        return { base, noteType: NOTE_TYPE_NAMES[base]!, dots, tuplet: null };
+      }
 
       for (const actual of [3, 5, 6, 7, 9, 11, 13]) {
-        if (dotted.tuplet(actual, normalCountFor(actual)).equals(duration)) {
-          return `${base}${'.'.repeat(dots)}${actual}`;
+        const normal = normalCountFor(actual);
+        if (dotted.tuplet(actual, normal).equals(duration)) {
+          return { base, noteType: NOTE_TYPE_NAMES[base]!, dots, tuplet: { actual, normal } };
         }
       }
     }
   }
   return null;
+}
+
+/**
+ * Escribe una duracion como token de SinfoScript.
+ *
+ * Devuelve null si la duracion no se puede escribir con una sola figura: quien
+ * llame decide si partirla en varias atadas o si es un error.
+ */
+export function formatDurationToken(duration: Duration): string | null {
+  const shape = analyzeDuration(duration);
+  if (!shape) return null;
+  return `${shape.base}${'.'.repeat(shape.dots)}${shape.tuplet ? shape.tuplet.actual : ''}`;
 }
 
 /** true si la duracion se puede escribir con una sola figura. */

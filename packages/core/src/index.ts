@@ -92,10 +92,13 @@ export {
   type SerializeOptions,
 } from './notation/sinfoscript.js';
 export {
+  analyzeDuration,
   formatDurationToken,
   isWritableDuration,
   splitIntoWritable,
   parseDurationToken,
+  type DurationShape,
+  type TupletShape,
 } from './notation/duration-token.js';
 export {
   parseGrid,
@@ -110,6 +113,12 @@ export { stripComment, stripComments } from './notation/comments.js';
 // ---------------------------------------------------------------- estructura
 export { Timeline, type TimedValue } from './structure/timeline.js';
 export { restsBetween } from './structure/rests.js';
+export {
+  splitIntoMeasures,
+  type MeasureSlice,
+  type NotatedEvent,
+  type SplitOptions,
+} from './structure/measures.js';
 export { Voice, type PositionedEvent } from './structure/voice.js';
 export { DEFAULT_VOICE_ID, Part } from './structure/part.js';
 export { Movement } from './structure/movement.js';
