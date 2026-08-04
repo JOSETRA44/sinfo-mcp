@@ -7,4 +7,5 @@
  */
 
 export { MidiFileRenderer } from './midi/midi-renderer.js';
+export { MusicXmlRenderer } from './musicxml/musicxml-renderer.js';
 export { assignChannels, PERCUSSION_CHANNEL, type ChannelAssignment } from './midi/channels.js';
