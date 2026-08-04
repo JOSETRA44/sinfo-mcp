@@ -46,8 +46,16 @@ export interface ScoreRenderOptions {
   readonly format?: 'svg' | 'musicxml' | 'lilypond' | 'abc';
 }
 
-/** Convierte una partitura en notacion legible o grabada. */
+/**
+ * Convierte una partitura en notacion legible o grabada.
+ *
+ * `formats` no es decorativo: varios formatos de partitura comparten puerto, y
+ * sin declararlo un adaptador de MusicXML atenderia una peticion de LilyPond
+ * devolviendo MusicXML sin avisar. Es mejor decir "ese formato no esta" que
+ * entregar un archivo que no es el que se pidio.
+ */
 export interface ScoreRenderer {
+  readonly formats: readonly ExportFormat[];
   render(score: Score, options?: ScoreRenderOptions): Promise<RenderedArtifact>;
 }
 
@@ -61,6 +69,7 @@ export interface AudioRenderOptions {
 
 /** Sintetiza la partitura a audio para que el agente pueda escucharla. */
 export interface AudioRenderer {
+  readonly formats: readonly ExportFormat[];
   render(score: Score, options?: AudioRenderOptions): Promise<RenderedArtifact>;
 }
 

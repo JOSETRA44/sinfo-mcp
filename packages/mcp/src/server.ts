@@ -1,6 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { ScoreService, type ArtifactSink, type RenderPorts } from '@sinfo/engine';
-import { MidiFileRenderer } from '@sinfo/render';
+import { MidiFileRenderer, MusicXmlRenderer } from '@sinfo/render';
 import { FileArtifactSink } from './adapters/file-sink.js';
 import { ok, toolError } from './result.js';
 import { ALL_TOOLS, type ToolContext } from './tools/index.js';
@@ -27,9 +27,9 @@ export function createPorts(options: CreateServerOptions = {}): RenderPorts {
   return {
     midi: options.ports?.midi ?? new MidiFileRenderer(),
     sink: options.sink ?? options.ports?.sink ?? new FileArtifactSink(),
-    // Partitura grabada y audio llegan en fases posteriores. Que falten no
-    // impide arrancar: `export` responde diciendo que formatos si hay.
-    ...(options.ports?.score ? { score: options.ports.score } : {}),
+    score: options.ports?.score ?? new MusicXmlRenderer(),
+    // El audio llega en una fase posterior. Que falte no impide arrancar:
+    // `export` responde diciendo que formatos si hay.
     ...(options.ports?.audio ? { audio: options.ports.audio } : {}),
   };
 }

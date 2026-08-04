@@ -282,7 +282,41 @@ describe('el servidor corrige al agente en vez de romperse', () => {
 
     const error = await callExpectingError('export', { scoreId, format: 'wav' });
     expect(error.code).toBe('FORMAT_UNAVAILABLE');
-    expect(error.details?.['availableNow']).toEqual(['midi', 'json']);
+    // La lista se calcula de los adaptadores montados, no de una constante.
+    expect(error.details?.['availableNow']).toContain('midi');
+    expect(error.details?.['availableNow']).toContain('musicxml');
+    expect(error.details?.['availableNow']).not.toContain('wav');
+  });
+
+  // LilyPond comparte puerto con MusicXML: sin declarar que formatos cubre
+  // cada adaptador, pedir LilyPond devolvia un MusicXML sin avisar.
+  it('no entrega un formato por otro cuando comparten adaptador', async () => {
+    const { scoreId } = await call<{ scoreId: string }>('score_create', {
+      title: 'Formato equivocado',
+      instruments: ['violin'],
+    });
+    await call('part_write', { scoreId, partId: 'violin', notation: 'c4/w' });
+
+    const error = await callExpectingError('export', { scoreId, format: 'lilypond' });
+    expect(error.code).toBe('FORMAT_UNAVAILABLE');
+  });
+
+  it('exporta MusicXML de verdad', async () => {
+    const { scoreId } = await call<{ scoreId: string }>('score_create', {
+      title: 'Partitura',
+      instruments: ['violin'],
+    });
+    await call('part_write', { scoreId, partId: 'violin', notation: 'c4/q d4/q e4/q f4/q' });
+
+    const result = await call<{ format: string; meta: Record<string, unknown> }>('export', {
+      scoreId,
+      format: 'musicxml',
+    });
+    expect(result.format).toBe('musicxml');
+    expect(result.meta['measures']).toBe(1);
+
+    const xml = new TextDecoder().decode(sink.saved.at(-1)!.artifact.data);
+    expect(xml).toContain('<score-partwise version="4.0">');
   });
 
   it('la escritura fallida no deja la partitura a medias', async () => {

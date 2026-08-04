@@ -61,15 +61,15 @@ async function renderArtifact(
     case 'lilypond':
     case 'abc':
     case 'svg':
-      if (!ports.score) {
-        return unavailable(format, 'partitura');
+      if (!ports.score?.formats.includes(format)) {
+        return unavailable(format, 'partitura', ports);
       }
       return ports.score.render(score, { ...movementOption, format });
 
     case 'wav':
     case 'mp3':
-      if (!ports.audio) {
-        return unavailable(format, 'audio');
+      if (!ports.audio?.formats.includes(format)) {
+        return unavailable(format, 'audio', ports);
       }
       return ports.audio.render(score, { ...movementOption, format });
 
@@ -87,12 +87,19 @@ async function renderArtifact(
  * El formato existe pero su adaptador no esta montado todavia.
  *
  * Se distingue de "formato desconocido" a proposito: el agente necesita saber
- * si debe cambiar de formato o si le falta instalar algo.
+ * si debe cambiar de formato o si le falta instalar algo. La lista de lo que
+ * SI hay se calcula de los puertos montados, no de una constante: una lista
+ * escrita a mano se queda obsoleta en cuanto se enchufa un adaptador nuevo.
  */
-function unavailable(format: ExportFormat, adapter: string): never {
+function unavailable(format: ExportFormat, adapter: string, ports: RenderPorts): never {
   return fail(
     'FORMAT_UNAVAILABLE',
     `El formato "${format}" necesita el adaptador de ${adapter}, que no esta disponible en esta instalacion`,
-    { format, adapter, availableNow: ['midi', 'json'] },
+    { format, adapter, availableNow: availableFormats(ports) },
   );
+}
+
+/** Formatos que esta instalacion puede producir ahora mismo. */
+export function availableFormats(ports: RenderPorts): ExportFormat[] {
+  return ['midi', 'json', ...(ports.score?.formats ?? []), ...(ports.audio?.formats ?? [])];
 }
