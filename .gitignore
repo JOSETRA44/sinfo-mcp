@@ -1,0 +1,24 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.cache/
+coverage/
+
+# Artefactos musicales generados durante pruebas
+out/
+*.mid
+*.midi
+*.wav
+*.mp3
+*.ogg
+!test/**/fixtures/**/*.mid
+!test/**/fixtures/**/*.midi
+
+# SoundFonts: nunca se versionan (30-140 MB)
+*.sf2
+*.sf3
+*.dls
+
+.DS_Store
+.env
+.env.local

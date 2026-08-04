@@ -1,0 +1,25 @@
+{
+  "name": "@sinfo/engine",
+  "version": "0.1.0",
+  "description": "Capa de aplicacion: sesion de partitura, casos de uso y puertos de salida.",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts --clean --sourcemap"
+  },
+  "dependencies": {
+    "@sinfo/core": "0.1.0"
+  },
+  "source": "./src/index.ts"
+}
