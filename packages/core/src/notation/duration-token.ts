@@ -90,3 +90,53 @@ export function formatDurationToken(duration: Duration): string | null {
 export function isWritableDuration(duration: Duration): boolean {
   return formatDurationToken(duration) !== null;
 }
+
+/**
+ * Figuras para partir, de mayor a menor: SIN puntillo y sin grupos
+ * irregulares.
+ *
+ * Con puntillos, el reparto voraz de una espera de ocho compases empezaba por
+ * la redonda de doble puntillo (7/4) y salian cinco simbolos raros donde un
+ * copista escribe ocho silencios de redonda. Toda duracion con denominador
+ * potencia de dos se descompone exactamente en figuras simples, que es la
+ * respuesta convencional y ademas la predecible.
+ *
+ * Las duraciones con puntillo no pierden nada: `formatDurationToken` ya las
+ * reconoce enteras y nunca llegan a partirse.
+ */
+const WRITABLE_DESCENDING: readonly Duration[] = BASE_ORDER.map(
+  (base) => BASE_TOKENS[base]!,
+).sort((a, b) => b.compare(a));
+
+/**
+ * Parte una duracion en figuras que si se pueden escribir.
+ *
+ * No toda duracion cabe en un simbolo: no existe el silencio de ocho redondas
+ * (los ocho compases de espera de una trompa que entra tarde), ni la figura
+ * que valga 5/16. La notacion real resuelve esto con varias figuras seguidas,
+ * y esto hace lo mismo: toma la mayor que quepa y repite.
+ *
+ * Si la duracion ya es escribible, se devuelve tal cual: un tresillo no se
+ * parte en nada.
+ */
+export function splitIntoWritable(duration: Duration): Duration[] {
+  if (duration.isZero || duration.isNegative) return [];
+  if (isWritableDuration(duration)) return [duration];
+
+  const pieces: Duration[] = [];
+  let remaining = duration;
+
+  // Cota de seguridad: con figuras hasta la semifusa, cualquier duracion
+  // razonable se agota en pocas decenas de pasos.
+  for (let guard = 0; guard < 512 && !remaining.isZero; guard++) {
+    const fits = WRITABLE_DESCENDING.find((candidate) => !candidate.greaterThan(remaining));
+    if (!fits) break;
+    pieces.push(fits);
+    remaining = remaining.minus(fits);
+  }
+
+  // Un resto imposible de cubrir (un tresillo suelto dentro de un hueco
+  // irregular) se devuelve entero: mejor un simbolo raro que perder tiempo.
+  if (!remaining.isZero) pieces.push(remaining);
+  return pieces;
+}

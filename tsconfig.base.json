@@ -3,6 +3,9 @@
   "compilerOptions": {
     "target": "ES2023",
     "lib": ["ES2023"],
+    // Sin DOM: esto corre en Node. `types` explicito evita que se cuelen
+    // globales de cualquier @types que aparezca en node_modules.
+    "types": ["node"],
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
 

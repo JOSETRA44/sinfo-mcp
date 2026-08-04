@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { DomainError } from '../errors.js';
 import { isChord, isRest, type MusicalEvent } from '../event/event.js';
 import { Duration } from '../time/duration.js';
-import { formatDurationToken, parseDurationToken } from './duration-token.js';
+import { formatDurationToken, parseDurationToken, splitIntoWritable } from './duration-token.js';
 import { parseGrid, PERCUSSION_MAP } from './grid.js';
 import { parseVoice, serializeVoice, validateBarlines } from './sinfoscript.js';
 
@@ -57,6 +57,41 @@ describe('tokens de duracion', () => {
   it('devuelve null si la duracion no cabe en una figura', () => {
     // 5/16 necesita dos figuras atadas.
     expect(formatDurationToken(Duration.of(5, 16))).toBeNull();
+  });
+
+  describe('partir en figuras escribibles', () => {
+    it('deja intacta la que ya se puede escribir', () => {
+      expect(splitIntoWritable(Duration.QUARTER).map(String)).toEqual(['1/4']);
+      // Un tresillo es una figura valida: no se parte.
+      expect(splitIntoWritable(parseDurationToken('e3')).map(String)).toEqual(['1/12']);
+    });
+
+    it('parte 5/16 en negra mas semicorchea', () => {
+      expect(splitIntoWritable(Duration.of(5, 16)).map(String)).toEqual(['1/4', '1/16']);
+    });
+
+    // El caso que rompia el relleno de compases de espera.
+    it('parte una espera de ocho compases en ocho silencios de redonda', () => {
+      const pieces = splitIntoWritable(Duration.of(8, 1));
+      expect(pieces).toHaveLength(8);
+      expect(pieces.every((p) => p.equals(Duration.WHOLE))).toBe(true);
+    });
+
+    it('los trozos suman siempre la duracion original', () => {
+      for (const [num, den] of [[5, 16], [8, 1], [7, 8], [13, 32], [3, 1]] as const) {
+        const original = Duration.of(num, den);
+        const total = splitIntoWritable(original).reduce(
+          (sum, piece) => sum.plus(piece),
+          Duration.ZERO,
+        );
+        expect(total.equals(original), `${num}/${den}`).toBe(true);
+      }
+    });
+
+    it('no devuelve nada para duracion cero o negativa', () => {
+      expect(splitIntoWritable(Duration.ZERO)).toEqual([]);
+      expect(splitIntoWritable(Duration.of(-1, 4))).toEqual([]);
+    });
   });
 });
 

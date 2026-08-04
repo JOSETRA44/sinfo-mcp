@@ -5,7 +5,7 @@ import { chord, note, rest, type EventOptions, type MusicalEvent } from '../even
 import { Pitch } from '../pitch/pitch.js';
 import { Duration } from '../time/duration.js';
 import { stripComments } from './comments.js';
-import { formatDurationToken, parseDurationToken } from './duration-token.js';
+import { formatDurationToken, parseDurationToken, splitIntoWritable } from './duration-token.js';
 
 /**
  * SinfoScript: notacion compacta pensada para que la escriba y la lea un
@@ -226,13 +226,34 @@ export function serializeVoice(
   return pieces.join(' ');
 }
 
+/**
+ * Escribe un evento, partiendolo en varios si su duracion no cabe en una
+ * figura. Los silencios se reparten sin mas; las notas quedan atadas entre si
+ * para que sigan sonando como una sola.
+ */
 function serializeEvent(event: MusicalEvent): string {
-  const durationToken = formatDurationToken(event.duration);
+  if (formatDurationToken(event.duration) !== null) return serializeSingle(event, event.duration);
+
+  const pieces = splitIntoWritable(event.duration);
+  const isRestEvent = event.pitches.length === 0;
+
+  return pieces
+    .map((piece, index) => {
+      const isLast = index === pieces.length - 1;
+      const tied: MusicalEvent =
+        isRestEvent || isLast ? event : { ...event, tie: 'start' as const };
+      return serializeSingle(tied, piece);
+    })
+    .join(' ');
+}
+
+function serializeSingle(event: MusicalEvent, duration: Duration): string {
+  const durationToken = formatDurationToken(duration);
   if (durationToken === null) {
     invalid(
       'INVALID_DURATION',
-      `La duracion ${event.duration.toString()} no se puede escribir con una sola figura`,
-      { duration: event.duration.toString() },
+      `La duracion ${duration.toString()} no se puede escribir con ninguna figura`,
+      { duration: duration.toString() },
     );
   }
 

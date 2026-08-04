@@ -1,0 +1,35 @@
+{
+  "name": "sinfo-mcp",
+  "version": "0.1.0",
+  "description": "Servidor MCP de composicion musical: forma, armonia, contrapunto y orquestacion para agentes de IA.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "sinfo-mcp": "./dist/index.js"
+  },
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "source": "./src/index.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc --build",
+    "start": "node dist/index.js",
+    "inspect": "npx @modelcontextprotocol/inspector node dist/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@sinfo/core": "0.1.0",
+    "@sinfo/engine": "0.1.0",
+    "@sinfo/render": "0.1.0",
+    "zod": "^4.4.3"
+  }
+}

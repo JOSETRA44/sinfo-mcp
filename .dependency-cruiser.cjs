@@ -117,8 +117,8 @@ module.exports = {
       // analisis de capas quedaba mirando codigo compilado en vez del fuente:
       // las reglas seguian pasando pero sobre el grafo equivocado.
       mainFields: ['source', 'module', 'main'],
-      exportsFields: [],
-      conditionNames: ['import', 'require', 'node', 'default', 'types'],
+      exportsFields: ['exports'],
+      conditionNames: ['source', 'import', 'require', 'node', 'default', 'types'],
       extensions: ['.ts', '.js'],
     },
     reporterOptions: {

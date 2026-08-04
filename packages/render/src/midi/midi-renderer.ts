@@ -4,6 +4,7 @@ import {
   isRest,
   resolveVelocity,
   soundingPitch,
+  type Dynamic,
   type Movement,
   type Part,
   type Score,
@@ -183,7 +184,14 @@ function collectNotes(
   out: ScheduledNote[],
 ): void {
   for (const voice of part.voices) {
+    // La dinamica es una MARCA que rige hasta la siguiente, no una propiedad
+    // de cada nota: en la partitura se escribe una vez debajo del pentagrama.
+    // Sin arrastrarla, un pasaje marcado `p` sonaria suave solo en su primera
+    // nota y el resto volveria a mezzoforte.
+    let prevailingDynamic: Dynamic | undefined;
+
     for (const { position, event } of voice.positioned()) {
+      if (event.dynamic !== undefined) prevailingDynamic = event.dynamic;
       if (isRest(event)) continue;
 
       // Se redondea la POSICION ABSOLUTA, no cada duracion por separado. Si
@@ -202,6 +210,7 @@ function collectNotes(
 
       const velocity = resolveVelocity(event, {
         instrumentOffset: part.instrument.velocityOffset,
+        ...(prevailingDynamic !== undefined ? { prevailingDynamic } : {}),
       });
 
       for (const written of event.pitches) {

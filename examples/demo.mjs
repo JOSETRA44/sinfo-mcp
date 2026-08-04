@@ -11,9 +11,8 @@ import {
 } from '@sinfo/core';
 import { MidiFileRenderer } from '@sinfo/render';
 
-/** Velocity explicita mientras la curva de dinamicas esta pendiente. */
-const at = (source, velocity) =>
-  parseVoice(source).events.map((e) => ({ ...e, velocity }));
+/** Las dinamicas escritas se traducen solas a velocity (curva calibrada). */
+const at = (source) => parseVoice(source).events;
 
 const score = new Score('demo', { title: 'Demo Fase 1', composer: 'sinfo-mcp' });
 const m = score.first;
@@ -23,17 +22,17 @@ m.timeline.setKey(Duration.ZERO, KeySignature.parse('D minor'));
 
 // Melodia con tresillos, ligadura, staccato y acorde.
 m.addPart('vln', INSTRUMENTS['violin'], 'Violin I').mainVoice.append(
-  ...at('d5/q a4/e f4/e d4/q+stacc r/q | e5/e3 f5/e3 g5/e3 a5/h.~ a5/w', 92),
+  ...at('mf d5/q a4/e f4/e d4/q+stacc r/q | e5/e3 f5/e3 g5/e3 a5/h.~ a5/w'),
 );
 
 // Bajo en negras.
 m.addPart('vc', INSTRUMENTS['cello'], 'Violonchelo').mainVoice.append(
-  ...at('d3/h a2/h | bb2/h a2/h | d3/w', 76),
+  ...at('mp d3/h a2/h | bb2/h a2/h | d3/w'),
 );
 
 // Acordes en el piano.
 m.addPart('pno', INSTRUMENTS['piano'], 'Piano').mainVoice.append(
-  ...at('[d4,f4,a4]/h [a3,c#4,e4]/h | [bb3,d4,f4]/h [a3,c#4,e4]/h | [d4,f4,a4]/w', 64),
+  ...at('p [d4,f4,a4]/h [a3,c#4,e4]/h | [bb3,d4,f4]/h [a3,c#4,e4]/h | [d4,f4,a4]/w'),
 );
 
 // Groove de bateria en rejilla: dos compases.

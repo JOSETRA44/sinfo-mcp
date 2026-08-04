@@ -64,6 +64,23 @@ export interface AudioRenderer {
   render(score: Score, options?: AudioRenderOptions): Promise<RenderedArtifact>;
 }
 
+export interface SavedArtifact {
+  readonly path: string;
+  readonly bytes: number;
+}
+
+/**
+ * Destino donde se guardan los archivos generados.
+ *
+ * El motor no escribe en disco: solo produce bytes y pide que se guarden. Asi
+ * el mismo codigo sirve para un servidor stdio que escribe en una carpeta
+ * local, para uno HTTP que sube a almacenamiento remoto, y para los tests,
+ * que se quedan en memoria y no ensucian nada.
+ */
+export interface ArtifactSink {
+  save(artifact: RenderedArtifact, scoreId: string): Promise<SavedArtifact>;
+}
+
 /**
  * Conjunto de adaptadores que la aplicacion recibe inyectados.
  *
@@ -73,6 +90,8 @@ export interface AudioRenderer {
  */
 export interface RenderPorts {
   readonly midi: MidiRenderer;
+  readonly sink: ArtifactSink;
   readonly score?: ScoreRenderer;
   readonly audio?: AudioRenderer;
 }
+

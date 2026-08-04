@@ -236,6 +236,53 @@ describe('MidiFileRenderer', () => {
     expect(atBoundary.map((e) => e.event.type)).toEqual(['noteOff', 'noteOn']);
   });
 
+  // Regresion: la dinamica solo afectaba a la primera nota tras la marca y
+  // el resto del pasaje volvia a mezzoforte.
+  describe('la dinamica rige hasta la siguiente marca', () => {
+    it('arrastra la marca a todas las notas siguientes', () => {
+      const score = build((s) => {
+        s.first
+          .addPart('vln', INSTRUMENTS['violin']!)
+          .mainVoice.append(...parseVoice('pp c4/q d4/q e4/q ff f4/q g4/q').events);
+      });
+
+      const velocities = noteOnsOf(parseMidi(renderer.render(score).data).tracks[1]!).map(
+        (entry) => entry.event.velocity,
+      );
+
+      expect(velocities[0]).toBe(velocities[1]);
+      expect(velocities[1]).toBe(velocities[2]);
+      expect(velocities[3]).toBe(velocities[4]);
+      expect(velocities[3]!).toBeGreaterThan(velocities[0]!);
+    });
+
+    it('los silencios no interrumpen la dinamica vigente', () => {
+      const score = build((s) => {
+        s.first
+          .addPart('vln', INSTRUMENTS['violin']!)
+          .mainVoice.append(...parseVoice('pp c4/q r/q d4/q').events);
+      });
+
+      const velocities = noteOnsOf(parseMidi(renderer.render(score).data).tracks[1]!).map(
+        (entry) => entry.event.velocity,
+      );
+      expect(velocities[0]).toBe(velocities[1]);
+    });
+
+    it('cada voz lleva su propia dinamica', () => {
+      const score = build((s) => {
+        const part = s.first.addPart('pno', INSTRUMENTS['piano']!);
+        part.mainVoice.append(...parseVoice('ff c5/w').events);
+        part.ensureVoice('lh').append(...parseVoice('pp c2/w').events);
+      });
+
+      const velocities = noteOnsOf(parseMidi(renderer.render(score).data).tracks[1]!).map(
+        (entry) => entry.event.velocity,
+      );
+      expect(velocities[0]).not.toBe(velocities[1]);
+    });
+  });
+
   it('informa de lo exportado sin volcar la partitura', () => {
     const score = build((s) => {
       s.first

@@ -14,6 +14,7 @@ export default defineConfig({
       '@sinfo/core': pkg('core'),
       '@sinfo/engine': pkg('engine'),
       '@sinfo/render': pkg('render'),
+      'sinfo-mcp': pkg('mcp'),
     },
   },
   test: {

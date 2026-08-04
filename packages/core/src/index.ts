@@ -56,12 +56,16 @@ export {
   type Articulation,
 } from './event/articulation.js';
 export {
+  calibratedCurve,
   clampVelocity,
+  exponentialCurve,
+  linearCurve,
   resolveVelocity,
   DEFAULT_DYNAMIC,
   MAX_VELOCITY,
   MIN_VELOCITY,
   type VelocityContext,
+  type VelocityCurve,
 } from './event/velocity.js';
 
 // --------------------------------------------------------------- instrumento
@@ -90,6 +94,7 @@ export {
 export {
   formatDurationToken,
   isWritableDuration,
+  splitIntoWritable,
   parseDurationToken,
 } from './notation/duration-token.js';
 export {
@@ -104,6 +109,7 @@ export { stripComment, stripComments } from './notation/comments.js';
 
 // ---------------------------------------------------------------- estructura
 export { Timeline, type TimedValue } from './structure/timeline.js';
+export { restsBetween } from './structure/rests.js';
 export { Voice, type PositionedEvent } from './structure/voice.js';
 export { DEFAULT_VOICE_ID, Part } from './structure/part.js';
 export { Movement } from './structure/movement.js';
