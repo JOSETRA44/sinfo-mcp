@@ -9,7 +9,7 @@ import {
   Tempo,
   TimeSignature,
 } from '@sinfo/core';
-import { MidiFileRenderer } from '@sinfo/render';
+import { MidiFileRenderer, MusicXmlRenderer } from '@sinfo/render';
 
 /** Las dinamicas escritas se traducen solas a velocity (curva calibrada). */
 const at = (source) => parseVoice(source).events;
@@ -44,10 +44,15 @@ const groove = parseGrid(`
 const drums = m.addPart('dr', INSTRUMENTS['drums'], 'Bateria').mainVoice;
 drums.append(...groove.events, ...groove.events);
 
-const artifact = new MidiFileRenderer().render(score);
-const path = process.argv[2] ?? 'demo.mid';
-writeFileSync(path, artifact.data);
+const midiPath = process.argv[2] ?? 'demo.mid';
+const xmlPath = midiPath.replace(/\.mid$/, '.musicxml');
 
-console.log('Archivo:', path, `(${artifact.data.length} bytes)`);
-console.log('Meta   :', JSON.stringify(artifact.meta));
-console.log('Resumen:', JSON.stringify(score.summary(), null, 2));
+const midi = new MidiFileRenderer().render(score);
+writeFileSync(midiPath, midi.data);
+console.log(`MIDI     : ${midiPath} (${midi.data.length} bytes)`);
+console.log(`  meta   : ${JSON.stringify(midi.meta)}`);
+
+const xml = await new MusicXmlRenderer().render(score);
+writeFileSync(xmlPath, xml.data);
+console.log(`MusicXML : ${xmlPath} (${xml.data.length} bytes)`);
+console.log(`  meta   : ${JSON.stringify(xml.meta)}`);
