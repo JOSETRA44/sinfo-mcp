@@ -1,4 +1,5 @@
 import { exportScore } from './export.js';
+import { analyzeHarmony, checkVoiceLeading, harmonyProgression } from './harmony.js';
 import {
   checkRanges,
   instrumentsList,
@@ -37,6 +38,7 @@ export const ALL_TOOLS: readonly AnyToolDefinition[] = [
   timelineSet,
 
   // 2. componer
+  harmonyProgression,
   partWrite,
   partClear,
 
@@ -44,6 +46,8 @@ export const ALL_TOOLS: readonly AnyToolDefinition[] = [
   scoreDescribe,
   partRead,
   timelineDescribe,
+  analyzeHarmony,
+  checkVoiceLeading,
   checkRanges,
 
   // 4. sacar el resultado

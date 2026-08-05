@@ -430,6 +430,181 @@ describe('obras de varios movimientos', () => {
   });
 });
 
+describe('armonia', () => {
+  it('realiza una progresion de numeros romanos', async () => {
+    const { scoreId } = await call<{ scoreId: string }>('score_create', {
+      title: 'Progresion',
+      key: 'C major',
+    });
+
+    const result = await call<{
+      key: string;
+      chords: { roman: string; symbol: string; fn: string }[];
+      cadence: { type: string } | null;
+    }>('harmony_progression', { scoreId, progression: ['I', 'vi', 'ii', 'V7', 'I'] });
+
+    expect(result.key).toBe('C major');
+    expect(result.chords.map((c) => c.symbol)).toEqual(['C', 'Am', 'Dm', 'G7', 'C']);
+    expect(result.chords[3]!.fn).toBe('dominante');
+    expect(result.cadence?.type).toBe('autentica-perfecta');
+  });
+
+  it('toma la tonalidad de la partitura sin que haya que repetirla', async () => {
+    const { scoreId } = await call<{ scoreId: string }>('score_create', {
+      title: 'En mi bemol',
+      key: 'Eb major',
+    });
+
+    const result = await call<{ chords: { symbol: string }[] }>('harmony_progression', {
+      scoreId,
+      progression: ['I', 'V7'],
+    });
+    expect(result.chords.map((c) => c.symbol)).toEqual(['Eb', 'Bb7']);
+  });
+
+  it('en modo menor el V lleva la sensible', async () => {
+    const { scoreId } = await call<{ scoreId: string }>('score_create', {
+      title: 'En la menor',
+      key: 'A minor',
+    });
+
+    const result = await call<{ chords: { symbol: string; pitches: string[] }[] }>(
+      'harmony_progression',
+      { scoreId, progression: ['i', 'V', 'i'] },
+    );
+    expect(result.chords[1]!.symbol).toBe('E');
+    expect(result.chords[1]!.pitches.some((p) => p.startsWith('G#'))).toBe(true);
+  });
+
+  it('escribe la progresion en una parte cuando se le pide', async () => {
+    const { scoreId } = await call<{ scoreId: string }>('score_create', {
+      title: 'Escrita',
+      key: 'C major',
+      instruments: ['piano'],
+    });
+
+    const result = await call<{ writtenTo: string }>('harmony_progression', {
+      scoreId,
+      progression: ['I', 'IV', 'V', 'I'],
+      partId: 'piano',
+    });
+    expect(result.writtenTo).toBe('piano');
+
+    const described = await call<{ summary: { eventCount: number } }>('score_describe', { scoreId });
+    expect(described.summary.eventCount).toBe(4);
+  });
+
+  it('analiza la armonia de lo que hay escrito', async () => {
+    const { scoreId } = await call<{ scoreId: string }>('score_create', {
+      title: 'Analisis',
+      key: 'C major',
+      instruments: ['piano'],
+    });
+    await call('part_write', {
+      scoreId,
+      partId: 'piano',
+      notation: '[c3,e3,g3]/w | [f3,a3,c4]/w | [g2,b2,d3,f3]/w | [c3,e3,g3]/w',
+    });
+
+    const result = await call<{
+      chords: { measure: number; roman: string }[];
+      cadences: { type: string }[];
+      summary: { diatonic: number };
+    }>('analyze_harmony', { scoreId });
+
+    expect(result.chords.map((c) => c.roman)).toEqual(['I', 'IV', 'V7', 'I']);
+    expect(result.summary.diatonic).toBe(4);
+    expect(result.cadences.some((c) => c.type === 'autentica-perfecta')).toBe(true);
+  });
+
+  it('marca los acordes prestados como no diatonicos', async () => {
+    const { scoreId } = await call<{ scoreId: string }>('score_create', {
+      title: 'Prestado',
+      key: 'C major',
+      instruments: ['piano'],
+    });
+    await call('part_write', {
+      scoreId,
+      partId: 'piano',
+      notation: '[c3,e3,g3]/w | [bb2,d3,f3]/w',
+    });
+
+    const result = await call<{
+      chords: { roman: string; isDiatonic: boolean }[];
+      summary: { borrowed: number };
+    }>('analyze_harmony', { scoreId });
+
+    expect(result.chords[1]!.roman).toBe('bVII');
+    expect(result.chords[1]!.isDiatonic).toBe(false);
+    expect(result.summary.borrowed).toBe(1);
+  });
+
+  // El bucle de autocritica: errores que el modelo no ve releyendo su salida.
+  it('detecta quintas paralelas entre dos partes', async () => {
+    const { scoreId } = await call<{ scoreId: string }>('score_create', {
+      title: 'Paralelas',
+      instruments: ['cello', 'violin'],
+    });
+    await call('part_write', { scoreId, partId: 'cello', notation: 'c3/q d3/q' });
+    await call('part_write', { scoreId, partId: 'violin', notation: 'g3/q a3/q' });
+
+    const result = await call<{
+      errors: number;
+      byRule: Record<string, number>;
+      issues: { rule: string; measure: number; message: string }[];
+    }>('check_voice_leading', { scoreId });
+
+    expect(result.errors).toBeGreaterThan(0);
+    expect(result.byRule['quintas-paralelas']).toBe(1);
+    expect(result.issues[0]!.measure).toBe(1);
+    expect(result.issues[0]!.message).toContain('C3-G3');
+  });
+
+  it('ordena las voces de grave a agudo aunque se anadan al reves', async () => {
+    const { scoreId } = await call<{ scoreId: string }>('score_create', {
+      title: 'Orden',
+      instruments: ['violin', 'cello'],
+    });
+    await call('part_write', { scoreId, partId: 'violin', notation: 'g5/w' });
+    await call('part_write', { scoreId, partId: 'cello', notation: 'c3/w' });
+
+    const result = await call<{ voices: string[] }>('check_voice_leading', { scoreId });
+    expect(result.voices).toEqual(['cello', 'violin']);
+  });
+
+  it('un pasaje bien escrito no da errores', async () => {
+    const { scoreId } = await call<{ scoreId: string }>('score_create', {
+      title: 'Limpio',
+      instruments: ['cello', 'violin'],
+    });
+    await call('part_write', { scoreId, partId: 'cello', notation: 'c3/q d3/q' });
+    await call('part_write', { scoreId, partId: 'violin', notation: 'e4/q d4/q' });
+
+    const result = await call<{ errors: number }>('check_voice_leading', { scoreId });
+    expect(result.errors).toBe(0);
+  });
+
+  it('pide al menos dos voces para poder analizar', async () => {
+    const { scoreId } = await call<{ scoreId: string }>('score_create', {
+      title: 'Una sola',
+      instruments: ['violin'],
+    });
+    await call('part_write', { scoreId, partId: 'violin', notation: 'c4/w' });
+
+    const error = await callExpectingError('check_voice_leading', { scoreId });
+    expect(error.code).toBe('INVALID_REQUEST');
+  });
+
+  it('rechaza numeros romanos inventados explicando la sintaxis', async () => {
+    const { scoreId } = await call<{ scoreId: string }>('score_create', { title: 'Malo' });
+    const error = await callExpectingError('harmony_progression', {
+      scoreId,
+      progression: ['I', 'ZZ'],
+    });
+    expect(error.details?.['examples']).toBeTruthy();
+  });
+});
+
 describe('gestion de sesiones', () => {
   it('lista y cierra partituras', async () => {
     const a = await call<{ scoreId: string }>('score_create', { title: 'Primera' });
