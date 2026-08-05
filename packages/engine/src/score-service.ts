@@ -11,6 +11,14 @@ import {
 } from './operations/structure.js';
 import { exportScore, type ExportInput } from './operations/exporting.js';
 import {
+  analyzeHarmony,
+  checkVoiceLeadingIn,
+  harmonyProgression,
+  type AnalyzeHarmonyInput,
+  type CheckVoiceLeadingInput,
+  type HarmonyProgressionInput,
+} from './operations/harmony.js';
+import {
   checkRanges,
   describeScore,
   describeTimeline,
@@ -96,6 +104,25 @@ export class ScoreService {
     const result = setTimeline(movement, input);
     recordAction(session, `compas ${result.atMeasure}: ${result.applied.join(', ')}`);
     return result;
+  }
+
+  // ---------------------------------------------------------------- armonia
+
+  harmony(scoreId: string, movementId: string | undefined, input: HarmonyProgressionInput) {
+    const { session, movement } = this.resolve(scoreId, movementId);
+    const result = harmonyProgression(movement, input);
+    recordAction(session, `progresion ${input.progression.join('-')} en ${result.key}`);
+    return result;
+  }
+
+  analyzeHarmony(scoreId: string, movementId: string | undefined, input: AnalyzeHarmonyInput) {
+    const { movement } = this.resolve(scoreId, movementId);
+    return analyzeHarmony(movement, input);
+  }
+
+  checkVoiceLeading(scoreId: string, movementId: string | undefined, input: CheckVoiceLeadingInput) {
+    const { movement } = this.resolve(scoreId, movementId);
+    return checkVoiceLeadingIn(movement, input);
   }
 
   // ---------------------------------------------------------------- lectura

@@ -72,6 +72,20 @@ export {
 
 export { setTimeline, type SetTimelineInput, type SetTimelineResult } from './operations/timeline.js';
 
+export {
+  analyzeHarmony,
+  checkVoiceLeadingIn,
+  harmonyProgression,
+  type AnalyzedChord,
+  type AnalyzeHarmonyInput,
+  type AnalyzeHarmonyResult,
+  type CheckVoiceLeadingInput,
+  type CheckVoiceLeadingResult,
+  type HarmonyProgressionInput,
+  type HarmonyProgressionResult,
+  type RealizedChord,
+} from './operations/harmony.js';
+
 export { exportScore, type ExportInput, type ExportResult } from './operations/exporting.js';
 
 export { ScoreService, type ScoreServiceOptions } from './score-service.js';
