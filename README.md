@@ -22,11 +22,14 @@ Los archivos exportados van a `./sinfo-out/<scoreId>/`. Se cambia con la variabl
 ## Flujo típico
 
 ```
-score_create      abre la obra y devuelve un scoreId
-part_add          un instrumento por parte  (instruments_list para ver el catálogo)
-part_write        escribe la música en notación de texto
-check_ranges      verifica que nadie toca notas imposibles
-export            saca el .mid
+score_create          abre la obra y devuelve un scoreId
+part_add              un instrumento por parte  (instruments_list para el catálogo)
+harmony_progression   convierte I-vi-ii-V7-I en acordes reales
+part_write            escribe la música en notación de texto
+analyze_harmony       qué funciona cumple lo escrito, y dónde hay cadencias
+check_voice_leading   quintas y octavas paralelas, cruces, saltos
+check_ranges          nadie toca notas imposibles
+export                saca el .mid o el .musicxml
 ```
 
 La partitura no se reenvía nunca: se referencia por `scoreId`. `score_describe` da el resumen y `part_read` devuelve fragmentos acotados por compases.
@@ -76,9 +79,12 @@ mcp  →  render  →  engine  →  core
 | Paquete | Responsabilidad | Dependencias |
 |---|---|---|
 | `@sinfo/core` | Dominio: altura, duración, evento, voz, parte, movimiento, partitura, notación, división en compases | **ninguna** |
-| `@sinfo/engine` | Casos de uso, sesiones y puertos de salida | core |
+| `@sinfo/theory` | Escalas, acordes, números romanos, cadencias, conducción de voces | core |
+| `@sinfo/engine` | Casos de uso, sesiones y puertos de salida | core, theory |
 | `@sinfo/render` | Adaptadores de formato: MIDI y MusicXML | core, engine |
 | `sinfo-mcp` | Herramientas MCP y raíz de composición | todos |
+
+`@sinfo/theory` tampoco tiene dependencias externas. El plan preveía apoyarse en `tonal`, pero esa librería trabaja con cadenas de texto (`"C#4"`, `"Cmaj7"`) y aquí todo son objetos que conservan la ortografía: cada conversión de ida y vuelta es un sitio donde Do♯ puede volver como Re♭. Un acorde es una tónica más un patrón de intervalos — sale más corto construirlo que traducirlo.
 
 Tres decisiones que sostienen el resto:
 
@@ -98,13 +104,21 @@ npm run verify     # typecheck + tests + reglas de arquitectura
 
 Las reglas de `.dependency-cruiser.cjs` **fallan el build** si alguien invierte una dependencia o si `@sinfo/core` gana una dependencia externa. Están probadas inyectando violaciones deliberadas: una regla que nunca dispara no protege de nada.
 
+## Armonía
+
+Números romanos completos: `I ii V7 vii°7 viiø7 III+ bVII #iv`, inversiones por cifrado de bajo (`I6 I64 V65 V43 V42`) y dominantes secundarias (`V/V`, `V7/IV`).
+
+El modo menor recibe el trato que exige. Se construye con la escala armónica, así que `V` sale mayor y `vii°` disminuido — sin eso no hay cadencia auténtica. Pero el diatonismo se mide contra la colección completa del modo (natural **más** la sensible), porque el modo menor no tiene siete notas sino ocho: medirlo con una sola escala marcaba el relativo mayor como acorde prestado. Y el séptimo grado distingue `VII` (subtónica, Sol mayor en la menor) de `vii°` (sensible, Sol♯ disminuido), que son acordes distintos con funciones distintas.
+
+`check_voice_leading` separa **errores** de **avisos**: las quintas y octavas paralelas funden dos voces en una y son error; los cruces, solapamientos, quintas directas, espaciados anchos y saltos grandes son avisos. Cada uno dice en qué compás está, entre qué voces y por qué importa.
+
 ## Estado
 
-Funciona hoy: estructura de obra y movimientos, escritura en ambas notaciones, validación de compases, comprobación de rangos con transposición, y exportación a **MIDI**, **MusicXML** y JSON.
+Funciona hoy: estructura de obra y movimientos, escritura en ambas notaciones, validación de compases, armonía funcional y análisis, conducción de voces, comprobación de rangos con transposición, y exportación a **MIDI**, **MusicXML** y JSON.
 
-El MusicXML sale listo para MuseScore, Sibelius, Finale y Dorico: parte notas en las barras con ligaduras, escribe grupos irregulares con su corchete, declara la transposición de los instrumentos transpositores, usa `unpitched` en percusión y alinea todas las partes al mismo número de compases.
+El MusicXML sale listo para MuseScore, Sibelius, Finale y Dorico: parte notas en las barras con ligaduras, escribe grupos irregulares con su corchete, declara la transposición de los instrumentos transpositores, usa `unpitched` en percusión y alinea todas las partes al mismo número de compases. Verificado abriéndolo en MuseScore.
 
-Previsto: armonía y análisis funcional, generación de material temático, contrapunto, orquestación, y exportación a LilyPond, partitura SVG y audio.
+Previsto: generación de material temático y contrapunto, forma y orquestación a escala sinfónica, ritmos y groove, y exportación a LilyPond, partitura SVG y audio.
 
 ## Licencia
 

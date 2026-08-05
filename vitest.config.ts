@@ -12,6 +12,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@sinfo/core': pkg('core'),
+      '@sinfo/theory': pkg('theory'),
       '@sinfo/engine': pkg('engine'),
       '@sinfo/render': pkg('render'),
       'sinfo-mcp': pkg('mcp'),
