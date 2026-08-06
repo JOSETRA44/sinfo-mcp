@@ -294,16 +294,18 @@ describe('el servidor corrige al agente en vez de romperse', () => {
     });
     await call('part_write', { scoreId, partId: 'violin', notation: 'c4/w' });
 
-    const error = await callExpectingError('export', { scoreId, format: 'wav' });
+    // LilyPond aun no tiene adaptador; el resto de la cadena si.
+    const error = await callExpectingError('export', { scoreId, format: 'lilypond' });
     expect(error.code).toBe('FORMAT_UNAVAILABLE');
     // La lista se calcula de los adaptadores montados, no de una constante.
-    expect(error.details?.['availableNow']).toContain('midi');
-    expect(error.details?.['availableNow']).toContain('musicxml');
-    expect(error.details?.['availableNow']).not.toContain('wav');
+    for (const format of ['midi', 'musicxml', 'svg', 'wav']) {
+      expect(error.details?.['availableNow'], format).toContain(format);
+    }
+    expect(error.details?.['availableNow']).not.toContain('lilypond');
   });
 
-  // LilyPond comparte puerto con MusicXML: sin declarar que formatos cubre
-  // cada adaptador, pedir LilyPond devolvia un MusicXML sin avisar.
+  // LilyPond comparte puerto con MusicXML y SVG: sin declarar que formatos
+  // cubre cada adaptador, pedir LilyPond devolvia un MusicXML sin avisar.
   it('no entrega un formato por otro cuando comparten adaptador', async () => {
     const { scoreId } = await call<{ scoreId: string }>('score_create', {
       title: 'Formato equivocado',
@@ -311,8 +313,30 @@ describe('el servidor corrige al agente en vez de romperse', () => {
     });
     await call('part_write', { scoreId, partId: 'violin', notation: 'c4/w' });
 
-    const error = await callExpectingError('export', { scoreId, format: 'lilypond' });
+    const error = await callExpectingError('export', { scoreId, format: 'abc' });
     expect(error.code).toBe('FORMAT_UNAVAILABLE');
+  });
+
+  it('exporta partitura grabada y audio', async () => {
+    const { scoreId } = await call<{ scoreId: string }>('score_create', {
+      title: 'Ver y oir',
+      instruments: ['piano'],
+    });
+    await call('part_write', { scoreId, partId: 'piano', notation: 'c4/q e4/q g4/q c5/q' });
+
+    const svg = await call<{ format: string; bytes: number }>('export', {
+      scoreId,
+      format: 'svg',
+    });
+    expect(svg.format).toBe('svg');
+    expect(svg.bytes).toBeGreaterThan(5000);
+
+    const wav = await call<{ format: string; meta: Record<string, unknown> }>('export', {
+      scoreId,
+      format: 'wav',
+    });
+    expect(wav.format).toBe('wav');
+    expect(wav.meta['peak'] as number).toBeGreaterThan(0);
   });
 
   it('exporta MusicXML de verdad', async () => {

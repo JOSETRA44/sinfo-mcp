@@ -10,9 +10,13 @@ export const exportScore = defineTool({
     'estandar de formato 1 (una pista por parte, con mapa de tempo) que abre cualquier DAW ' +
     'o editor de partituras. "json" devuelve la estructura, util para inspeccionar sin ' +
     'abrir nada.\n\n' +
-    'Los formatos musicxml, lilypond, abc, svg, wav y mp3 estan previstos pero necesitan ' +
-    'adaptadores que pueden no estar montados; si pides uno que falta, el error te dice ' +
-    'cuales hay disponibles ahora mismo.',
+    '"musicxml" abre en MuseScore, Sibelius, Finale y Dorico. "svg" graba la partitura como ' +
+    'imagen: es la unica salida que TU puedes revisar directamente, para comprobar que la ' +
+    'notacion quedo legible. "wav" sintetiza el audio para que lo escuche la persona.\n\n' +
+    'El audio necesita un SoundFont General MIDI: sin el se usa un banco minimo de un solo ' +
+    'sonido y el resultado no representa la obra. Se configura con la variable de entorno ' +
+    'SINFO_SOUNDFONT. Los formatos lilypond, abc y mp3 aun no tienen adaptador; si pides uno ' +
+    'que falta, el error te dice cuales hay disponibles ahora mismo.',
   inputSchema: {
     scoreId: scoreIdSchema,
     format: z
