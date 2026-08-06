@@ -21,7 +21,8 @@
   },
   "dependencies": {
     "@sinfo/core": "0.1.0",
-    "@sinfo/theory": "0.1.0"
+    "@sinfo/theory": "0.1.0",
+    "@sinfo/generate": "0.1.0"
   },
   "source": "./src/index.ts"
 }

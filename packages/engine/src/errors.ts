@@ -13,7 +13,9 @@ export type ApplicationErrorCode =
   | 'SESSION_LIMIT_REACHED'
   | 'INVALID_REQUEST'
   | 'FORMAT_UNAVAILABLE'
-  | 'NOTATION_ERROR';
+  | 'NOTATION_ERROR'
+  /** Se pidio algo de la sesion que no existe: un motivo, una parte. */
+  | 'NOT_FOUND';
 
 export class ApplicationError extends Error {
   readonly code: ApplicationErrorCode;

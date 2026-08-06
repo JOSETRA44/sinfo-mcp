@@ -17,6 +17,9 @@
     },
     {
       "path": "../theory"
+    },
+    {
+      "path": "../generate"
     }
   ]
 }

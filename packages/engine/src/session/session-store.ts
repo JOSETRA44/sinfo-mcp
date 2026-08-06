@@ -1,4 +1,5 @@
 import type { Score } from '@sinfo/core';
+import type { Motif } from '@sinfo/generate';
 import { fail } from '../errors.js';
 
 export interface ScoreSession {
@@ -8,6 +9,12 @@ export interface ScoreSession {
   lastAccessedAt: number;
   /** Registro breve de lo hecho, para que el agente recupere el hilo. */
   readonly history: string[];
+  /**
+   * Motivos de la obra. Viven en la sesion igual que la partitura: el agente
+   * crea un tema, lo desarrolla varias veces y escribe la variante que le
+   * gusta, sin reenviar las notas en cada paso.
+   */
+  readonly motifs: Map<string, Motif>;
 }
 
 /**
@@ -53,6 +60,7 @@ export class InMemorySessionStore implements SessionStore {
       createdAt: now,
       lastAccessedAt: now,
       history: [],
+      motifs: new Map(),
     };
     this.sessions.set(score.id, session);
     return session;

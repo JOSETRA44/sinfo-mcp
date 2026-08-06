@@ -11,6 +11,18 @@ import {
 } from './operations/structure.js';
 import { exportScore, type ExportInput } from './operations/exporting.js';
 import {
+  counterpointAdd,
+  melodyGenerate,
+  motifCreate,
+  motifDevelop,
+  motifWrite,
+  type CounterpointInput,
+  type MelodyGenerateInput,
+  type MotifCreateInput,
+  type MotifDevelopInput,
+  type MotifWriteInput,
+} from './operations/generation.js';
+import {
   analyzeHarmony,
   checkVoiceLeadingIn,
   harmonyProgression,
@@ -103,6 +115,63 @@ export class ScoreService {
     const { session, movement } = this.resolve(scoreId, movementId);
     const result = setTimeline(movement, input);
     recordAction(session, `compas ${result.atMeasure}: ${result.applied.join(', ')}`);
+    return result;
+  }
+
+  // ------------------------------------------------------------- generacion
+
+  motifCreate(scoreId: string, input: MotifCreateInput) {
+    const { session } = this.resolve(scoreId, undefined);
+    const result = motifCreate(session.motifs, input);
+    recordAction(session, `motivo "${result.motifId}": ${result.notation}`);
+    return result;
+  }
+
+  motifDevelop(scoreId: string, movementId: string | undefined, input: MotifDevelopInput) {
+    const { session, movement } = this.resolve(scoreId, movementId);
+    const result = motifDevelop(session.motifs, movement, input);
+    recordAction(
+      session,
+      `motivo "${result.motifId}" desde "${input.motifId}": ` +
+        input.transformations.map((transformation) => transformation.op).join(', '),
+    );
+    return result;
+  }
+
+  motifWrite(scoreId: string, movementId: string | undefined, input: MotifWriteInput) {
+    const { session, movement } = this.resolve(scoreId, movementId);
+    const result = motifWrite(session.motifs, movement, input);
+    recordAction(session, `motivo "${input.motifId}" escrito en "${result.partId}"`);
+    return result;
+  }
+
+  motifList(scoreId: string) {
+    const { session } = this.resolve(scoreId, undefined);
+    return {
+      motifs: [...session.motifs.entries()].map(([motifId, motif]) => ({
+        motifId,
+        notation: motif.notation,
+        notes: motif.length,
+        duration: motif.duration.toString(),
+        derivation: motif.derivation,
+      })),
+    };
+  }
+
+  melodyGenerate(scoreId: string, movementId: string | undefined, input: MelodyGenerateInput) {
+    const { session, movement } = this.resolve(scoreId, movementId);
+    const result = melodyGenerate(session.motifs, movement, input);
+    recordAction(session, `melodia "${result.motifId}" (semilla ${result.seed})`);
+    return result;
+  }
+
+  counterpoint(scoreId: string, movementId: string | undefined, input: CounterpointInput) {
+    const { session, movement } = this.resolve(scoreId, movementId);
+    const result = counterpointAdd(movement, input);
+    recordAction(
+      session,
+      `contrapunto de "${input.sourcePartId}" en "${result.writtenTo}" (semilla ${result.seed})`,
+    );
     return result;
   }
 

@@ -86,6 +86,25 @@ export {
   type RealizedChord,
 } from './operations/harmony.js';
 
+export {
+  counterpointAdd,
+  melodyGenerate,
+  motifCreate,
+  motifDevelop,
+  motifWrite,
+  type CounterpointInput,
+  type CounterpointResultInfo,
+  type MelodyGenerateInput,
+  type MelodyGenerateResult,
+  type MotifCreateInput,
+  type MotifDevelopInput,
+  type MotifInfo,
+  type MotifStore,
+  type MotifWriteInput,
+  type Transformation,
+  type TransformationOp,
+} from './operations/generation.js';
+
 export { exportScore, type ExportInput, type ExportResult } from './operations/exporting.js';
 
 export { ScoreService, type ScoreServiceOptions } from './score-service.js';
