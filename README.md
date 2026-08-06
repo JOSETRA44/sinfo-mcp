@@ -19,6 +19,24 @@ claude mcp add sinfo -- node /ruta/a/sinfo-mcp/packages/mcp/dist/index.js
 
 Los archivos exportados van a `./sinfo-out/<scoreId>/`. Se cambia con la variable `SINFO_OUT_DIR`.
 
+### La skill
+
+El servidor expone treinta herramientas, pero el flujo correcto —planear la forma antes de escribir, verificar después de cada sección, apuntar las semillas para poder iterar— no se deduce de los esquemas. La skill se lo enseña al agente:
+
+```bash
+npx skills add JOSETRA44/sinfo-mcp@sinfo-mcp
+```
+
+No se instala sola al hacer `npm install`, a propósito: que instalar una dependencia cambie el comportamiento de tu agente debe ser una decisión tuya. El `postinstall` solo te recuerda el comando.
+
+### Audio
+
+Para que el WAV suene de verdad hace falta un SoundFont General MIDI. Sin él se usa un banco de un solo sonido:
+
+```bash
+SINFO_SOUNDFONT=/ruta/a/GeneralUser.sf2
+```
+
 ## Flujo típico
 
 ```

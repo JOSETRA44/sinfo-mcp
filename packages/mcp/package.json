@@ -18,12 +18,14 @@
   "types": "./dist/index.d.ts",
   "source": "./src/index.ts",
   "files": [
-    "dist"
+    "dist",
+    "skills"
   ],
   "scripts": {
     "build": "tsc --build",
     "start": "node dist/index.js",
-    "inspect": "npx @modelcontextprotocol/inspector node dist/index.js"
+    "inspect": "npx @modelcontextprotocol/inspector node dist/index.js",
+    "postinstall": "node ../../scripts/postinstall.mjs || true"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",
@@ -31,5 +33,15 @@
     "@sinfo/engine": "0.1.0",
     "@sinfo/render": "0.1.0",
     "zod": "^4.4.3"
-  }
+  },
+  "keywords": [
+    "mcp",
+    "music",
+    "composition",
+    "midi",
+    "musicxml",
+    "notation",
+    "orchestration",
+    "ai-agent"
+  ]
 }
