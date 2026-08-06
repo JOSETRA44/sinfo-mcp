@@ -22,6 +22,7 @@ import {
 } from '@sinfo/perform';
 import { type KeyEstimate, type WeightedPitch, estimateKey } from './key-estimate.js';
 import { type QuantizeOptions, type QuantizedNote, quantize } from './quantize.js';
+import { type RefineOptions, refineNotes } from './refine.js';
 import { spellPitch } from './spell.js';
 import { type NoteGroup, type SeparateOptions, separateVoices } from './voices.js';
 
@@ -49,6 +50,14 @@ export interface ToScoreOptions {
   readonly defaultInstrument?: string | undefined;
   readonly quantize?: QuantizeOptions | undefined;
   readonly separate?: SeparateOptions | undefined;
+  /**
+   * Depuracion con criterio musical antes de cuantizar.
+   *
+   * Va antes a proposito: un armonico fantasma que llega a la cuantizacion
+   * arrastra consigo una figura, una voz y una grafia, y limpiarlo despues
+   * obligaria a deshacer las tres.
+   */
+  readonly refine?: RefineOptions | undefined;
 }
 
 export interface TrackReport {
@@ -90,11 +99,28 @@ export function performanceToScore(
     );
   }
 
-  // ---- Cuantizar cada pista por separado.
-  const quantized = performance.tracks.map((track) => ({
-    track,
-    result: quantize(track.notes, grid, options.quantize),
-  }));
+  // ---- Depurar y cuantizar cada pista por separado.
+  const quantized = performance.tracks.map((track) => {
+    // La percusion no tiene armonicos ni registro que respetar: sus "alturas"
+    // son sonidos de bateria, y filtrarlas como si fueran notas las destroza.
+    const refined =
+      track.isPercussion === true
+        ? { notes: track.notes, report: null }
+        : refineNotes(track.notes, {
+            ...(track.instrumentId === undefined
+              ? {}
+              : { instrumentId: track.instrumentId }),
+            ...options.refine,
+          });
+
+    if (refined.report !== null) {
+      for (const explanation of refined.report.notes) {
+        warnings.push(`[${track.id}] ${explanation}`);
+      }
+    }
+
+    return { track, result: quantize(refined.notes, grid, options.quantize) };
+  });
 
   // ---- Tonalidad: se estima con TODAS las pistas juntas.
   //

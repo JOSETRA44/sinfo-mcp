@@ -40,6 +40,31 @@ const quantizeShape = {
       'Voces simultaneas por parte antes de recortar notas. 4 por defecto. Se supera igualmente ' +
         'si respetarlo obligaria a perder notas.',
     ),
+  dropHarmonics: z
+    .boolean()
+    .optional()
+    .describe(
+      'Descartar armonicos falsos: notas que entran a la vez que otra mas grave y mas fuerte, a ' +
+        'distancia de octava, doceava o quincena. Activado por defecto porque es el fallo mas ' +
+        'comun de la transcripcion de audio. DESACTIVALO si la obra dobla la melodia en octavas ' +
+        'de verdad, o perderas la voz de arriba.',
+    ),
+  mergeDuplicates: z
+    .boolean()
+    .optional()
+    .describe(
+      'Fundir en una sola las notas de la misma altura que se pisan. Los modelos parten a veces ' +
+        'una nota tenida en varios trozos cuando la intensidad flaquea. Activado por defecto.',
+    ),
+  minConfidence: z
+    .number()
+    .min(0)
+    .max(1)
+    .optional()
+    .describe(
+      'Descartar notas por debajo de esta confianza. Util cuando la grabacion tiene ruido de ' +
+        'fondo y aparecen notas fantasma sueltas.',
+    ),
   key: keySchema.describe(
     'Impone la tonalidad en vez de estimarla. Util cuando la estimacion sale con poca ' +
       'correlacion o confunde una tonalidad con su relativa: cambia como se escriben las ' +
@@ -192,7 +217,15 @@ function toOptions(args: {
   maxVoices?: number | undefined;
   key?: string | undefined;
   timeSignature?: string | undefined;
+  dropHarmonics?: boolean | undefined;
+  mergeDuplicates?: boolean | undefined;
+  minConfidence?: number | undefined;
 }) {
+  const refine = {
+    ...(args.dropHarmonics === undefined ? {} : { dropHarmonics: args.dropHarmonics }),
+    ...(args.mergeDuplicates === undefined ? {} : { mergeDuplicates: args.mergeDuplicates }),
+    ...(args.minConfidence === undefined ? {} : { minConfidence: args.minConfidence }),
+  };
   const quantize = {
     ...(args.gapPolicy === undefined ? {} : { gapPolicy: args.gapPolicy }),
     ...(args.subdivisions === undefined ? {} : { subdivisions: args.subdivisions }),
@@ -200,6 +233,7 @@ function toOptions(args: {
   };
   return {
     ...(Object.keys(quantize).length === 0 ? {} : { quantize }),
+    ...(Object.keys(refine).length === 0 ? {} : { refine }),
     ...(args.maxVoices === undefined ? {} : { separate: { maxVoices: args.maxVoices } }),
     ...(args.key === undefined ? {} : { key: KeySignature.parse(args.key) }),
     ...(args.timeSignature === undefined

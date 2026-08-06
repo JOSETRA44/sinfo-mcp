@@ -18,6 +18,9 @@ export { estimateKey, pitchClassProfile } from './key-estimate.js';
 export type { MelodicDirection } from './spell.js';
 export { spellPitch, spellSequence, tonalCenter } from './spell.js';
 
+export type { RefineOptions, RefineReport, RefineResult } from './refine.js';
+export { refineNotes } from './refine.js';
+
 export type { NoteGroup, SeparateOptions } from './voices.js';
 export { separateVoices } from './voices.js';
 
