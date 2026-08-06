@@ -1,0 +1,66 @@
+{
+  "skill_name": "sinfo-mcp",
+  "notes": "Casos de tarea (1-3) para medir si la skill mejora la composicion. Casos de disparo (4-9) para medir si la descripcion dispara cuando toca y calla cuando no.",
+  "evals": [
+    {
+      "id": 1,
+      "name": "vals-cuarteto",
+      "prompt": "hazme un vals para cuarteto de cuerda, en sol mayor, algo ligero de unos 24 compases. cuando lo tengas exportamelo a midi y a partitura para verla",
+      "expected_output": "Obra de ~24 compases con forma planificada, cuarteto montado, melodia sobre armonia, verificacion de conduccion de voces y rangos, y exportacion a .mid (con groove waltz) y .svg.",
+      "assertions": [
+        { "text": "Llama a plan_form antes de escribir notas", "rationale": "24 compases pasa del umbral donde el plan formal evita perderse" },
+        { "text": "Usa ensemble_add con string_quartet en vez de cuatro part_add", "rationale": "La skill senala que ahorra llamadas y evita ids mal puestos" },
+        { "text": "Escribe barras de compas en la notacion de part_write, o usa melody_generate", "rationale": "Las barras activan la validacion de tiempos" },
+        { "text": "Llama a check_voice_leading o check_ranges antes de exportar", "rationale": "El bucle de verificacion es el nucleo de la skill" },
+        { "text": "Exporta a midi y a svg", "rationale": "Lo pedido explicitamente" },
+        { "text": "El compas de la obra es 3/4", "rationale": "Un vals no es un vals en 4/4" },
+        { "text": "check_ranges no devuelve ninguna nota below-range ni above-range", "rationale": "Musica tocable" }
+      ],
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "beat-trap",
+      "prompt": "necesito un beat de trap de 8 compases, 140 bpm, con hi-hats rapidos y el bombo bien marcado. dame el midi para meterlo en el DAW",
+      "expected_output": "Ocho compases de percusion en notacion de rejilla, tempo 140, exportado a MIDI con la bateria en canal 10.",
+      "assertions": [
+        { "text": "Usa notacion de rejilla y no SinfoScript para la bateria", "rationale": "La rejilla es la notacion correcta para ritmos programados" },
+        { "text": "El tempo de la partitura es 140", "rationale": "Lo pedido" },
+        { "text": "Exporta a MIDI", "rationale": "Lo pedido" },
+        { "text": "La parte de percusion sale en el canal MIDI 10", "rationale": "Convencion General MIDI; se comprueba en el archivo" },
+        { "text": "No llama a check_voice_leading sobre una parte de percusion sola", "rationale": "No tiene sentido y la skill no lo pide; mide que no haga ceremonia inutil" }
+      ],
+      "files": []
+    },
+    {
+      "id": 3,
+      "name": "orquestar-melodia",
+      "prompt": "tengo esta melodia: do re mi fa sol la sol fa mi re do, en do mayor, negras. quiero orquestarla para orquesta sinfonica completa, que suene grande. dame partitura y audio",
+      "expected_output": "Melodia escrita, orquesta montada, orquestacion en estilo tutti, verificacion de balance y rangos, exportacion a SVG y WAV.",
+      "assertions": [
+        { "text": "Usa ensemble_add con symphony_orchestra", "rationale": "'Orquesta sinfonica completa' tiene plantilla" },
+        { "text": "Llama a orchestrate en vez de escribir cada parte a mano", "rationale": "Es la herramienta para esto" },
+        { "text": "Usa style tutti o justifica otro", "rationale": "'Que suene grande' pide masa sonora" },
+        { "text": "Llama a check_ranges tras orquestar", "rationale": "La orquestacion es donde mas facil se sale de rango" },
+        { "text": "Exporta a svg y a wav", "rationale": "Lo pedido" },
+        { "text": "Ninguna nota queda fuera del rango fisico de su instrumento", "rationale": "La transposicion aplicada correctamente" },
+        { "text": "Menciona al usuario si el balance dio avisos", "rationale": "orchestrate los devuelve; ignorarlos desperdicia la verificacion" }
+      ],
+      "files": []
+    },
+
+    { "id": 4, "trigger_only": true, "should_trigger": true,
+      "prompt": "quiero armonizar esta melodia que compuse, esta en re menor y son 16 compases. no se me da bien la armonia, algo que suene clasico" },
+    { "id": 5, "trigger_only": true, "should_trigger": true,
+      "prompt": "me puedes hacer un coral a cuatro voces estilo bach sobre el tema de la alegria? y que me digas si tiene quintas paralelas" },
+    { "id": 6, "trigger_only": true, "should_trigger": true,
+      "prompt": "necesito musica de fondo para un video, algo tranquilo de piano, un par de minutos, y que me des el archivo para editarlo" },
+
+    { "id": 7, "trigger_only": true, "should_trigger": false,
+      "prompt": "tengo un mp3 de una cancion y quiero separar la voz del instrumental, hay alguna forma de hacerlo desde la terminal?" },
+    { "id": 8, "trigger_only": true, "should_trigger": false,
+      "prompt": "quiero hacer una web para mi grupo de musica, con las fechas de conciertos y un reproductor. next.js o astro?" },
+    { "id": 9, "trigger_only": true, "should_trigger": false,
+      "prompt": "explicame por que el acorde de sexta napolitana se llama asi y en que contextos se usa historicamente" }
+  ]
+}
