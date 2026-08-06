@@ -56,3 +56,13 @@ export {
   type RoleAssignment,
   type TextureRole,
 } from './orchestration.js';
+
+export {
+  getGroove,
+  GROOVE_PRESETS,
+  humanize,
+  listGrooves,
+  type GrooveProfile,
+  type HumanizeOptions,
+  type PerformedNote,
+} from './groove.js';
