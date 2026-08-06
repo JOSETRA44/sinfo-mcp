@@ -206,10 +206,19 @@ describe('ida y vuelta por audio', () => {
     await expect(fallbackLoader().load(path)).rejects.toThrow(/mudo/);
   });
 
-  it('rechaza formatos comprimidos en vez de intentarlo a medias', async () => {
+  it('sin sidecar explica que un comprimido necesita el sidecar', async () => {
+    // El MP3 ya no se rechaza por desconocido: se acepta la extension para
+    // poder decir QUE falta. Un "no reconozco esa extension" no le sirve a
+    // nadie para arreglarlo; un "instala esto" si.
     const path = join(directory, 'cancion.mp3');
     await writeFile(path, new Uint8Array([0, 1, 2]));
-    await expect(fallbackLoader().load(path)).rejects.toThrow(/WAV sin comprimir/);
+    await expect(fallbackLoader().load(path)).rejects.toThrow(/hace falta el sidecar/);
+  });
+
+  it('sigue rechazando lo que no es audio', async () => {
+    const path = join(directory, 'notas.txt');
+    await writeFile(path, 'esto no es audio');
+    await expect(fallbackLoader().load(path)).rejects.toThrow(/No se reconoce el formato/);
   });
 
   it('ante un acorde devuelve una sola nota, que es su limite conocido', async () => {

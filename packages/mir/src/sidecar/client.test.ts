@@ -33,11 +33,11 @@ describe.skipIf(!hasPython)('SidecarClient contra el sidecar real', () => {
   it('describe informa de version y capacidades', async () => {
     const info = await local().describe();
     expect(info?.name).toBe('sinfo-mir');
-    expect(info?.capabilities.map((entry) => entry.name)).toEqual([
-      'beats',
-      'separate',
-      'notes',
-    ]);
+    // Se comprueba que estan las esperadas, no que sean EXACTAMENTE esas: el
+    // sidecar puede ganar etapas nuevas y esta prueba no deberia romperse por
+    // ello, solo si desaparece alguna de las que el servidor da por hechas.
+    const names = info?.capabilities.map((entry) => entry.name) ?? [];
+    expect(names).toEqual(expect.arrayContaining(['decode', 'beats', 'separate', 'notes']));
   });
 
   it('cada capacidad que falta trae la orden para instalarla', async () => {

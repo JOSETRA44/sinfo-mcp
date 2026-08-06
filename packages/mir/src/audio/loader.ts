@@ -1,5 +1,6 @@
+import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
-import { basename, extname } from 'node:path';
+import { basename, extname, join } from 'node:path';
 import { getInstrument } from '@sinfo/core';
 import { ApplicationError } from '@sinfo/engine';
 import type {
@@ -22,8 +23,28 @@ import { decodeWav } from './wav.js';
 import { segmentNotes } from './segment.js';
 import { detectPitch } from './yin.js';
 
-/** Extensiones que este cargador reconoce. */
-const AUDIO_EXTENSIONS = new Set(['.wav', '.wave']);
+/** Formatos que se leen siempre, sin depender de nada instalado aparte. */
+const NATIVE_EXTENSIONS = new Set(['.wav', '.wave']);
+
+/**
+ * Formatos comprimidos: necesitan que el sidecar los decodifique.
+ *
+ * Se aceptan en `accepts` aunque el sidecar pueda no estar, para poder dar un
+ * error que explique QUE falta. Rechazarlos de plano produciria un "no
+ * reconozco esta extension" que no ayuda a nadie a arreglarlo.
+ */
+const DECODABLE_EXTENSIONS = new Set([
+  '.mp3',
+  '.flac',
+  '.ogg',
+  '.oga',
+  '.opus',
+  '.m4a',
+  '.aiff',
+  '.aif',
+]);
+
+const AUDIO_EXTENSIONS = new Set([...NATIVE_EXTENSIONS, ...DECODABLE_EXTENSIONS]);
 
 /** Por debajo de este nivel eficaz, el archivo esta practicamente mudo. */
 const SILENT_THRESHOLD = 0.001;
@@ -97,25 +118,42 @@ export class AudioFileLoader implements PerformanceLoader {
     if (!AUDIO_EXTENSIONS.has(extension)) {
       throw new ApplicationError(
         'FORMAT_UNAVAILABLE',
-        `Solo se lee audio WAV sin comprimir, y "${basename(path)}" no lo es. Los formatos ` +
-          'comprimidos (MP3, OGG, FLAC) necesitan un decodificador nativo, que este proyecto ' +
-          'evita a proposito. Conviertelo antes a WAV.',
+        `No se reconoce el formato de "${basename(path)}" (${extension || 'sin extension'}). ` +
+          `Se leen ${[...AUDIO_EXTENSIONS].join(', ')}.`,
+        { path, extension },
+      );
+    }
+
+    const stages = await this.sidecar.availableStages();
+    const name = options.name ?? basename(path);
+
+    // Los comprimidos pasan antes por el sidecar. El WAV resultante se cachea,
+    // asi que decodificar una cancion larga se paga una sola vez.
+    const wavPath =
+      NATIVE_EXTENSIONS.has(extension) || !stages.includes('decode')
+        ? path
+        : await this.decodeViaSidecar(path);
+
+    if (!NATIVE_EXTENSIONS.has(extension) && wavPath === path) {
+      throw new ApplicationError(
+        'FORMAT_UNAVAILABLE',
+        `"${basename(path)}" esta comprimido y hace falta el sidecar para decodificarlo. ` +
+          "Instalalo con `uv tool install 'sinfo-mir[all]'`, o convierte el archivo a WAV.",
         { path, extension },
       );
     }
 
     let data: Uint8Array;
     try {
-      data = new Uint8Array(await readFile(path));
+      data = new Uint8Array(await readFile(wavPath));
     } catch (error) {
       throw new ApplicationError(
         'INVALID_REQUEST',
-        `No se pudo leer "${path}": ${error instanceof Error ? error.message : String(error)}`,
+        `No se pudo leer "${wavPath}": ${error instanceof Error ? error.message : String(error)}`,
         { path },
       );
     }
 
-    const name = options.name ?? basename(path);
     const clip = decodeWav(data, name);
 
     if (clipLevel(clip) < SILENT_THRESHOLD) {
@@ -126,11 +164,9 @@ export class AudioFileLoader implements PerformanceLoader {
       );
     }
 
-    // Que motor hay disponible se decide aqui y no en la configuracion: el
-    // sidecar mejora el resultado cuando esta, y su ausencia no debe impedir
+    // Que motor se usa se decide aqui y no en la configuracion: el sidecar
+    // mejora el resultado cuando esta, y su ausencia no debe impedir
     // transcribir, solo acotar lo que se puede transcribir.
-    const stages = await this.sidecar.availableStages();
-
     const polyphonic = stages.includes('notes');
     const notes = polyphonic
       ? await this.notesViaSidecar(path, options.instrumentId)
@@ -151,6 +187,25 @@ export class AudioFileLoader implements PerformanceLoader {
       ...(grid === undefined ? {} : { grid }),
       source: { kind: 'audio', name, model: polyphonic ? 'basic_pitch' : 'yin' },
     };
+  }
+
+  /**
+   * Decodifica un formato comprimido a WAV, cacheando el resultado.
+   *
+   * Se devuelve la ruta del original si el sidecar falla, para que quien
+   * llama pueda distinguir "no se pudo" de "no hacia falta" y explicarlo.
+   */
+  private async decodeViaSidecar(path: string): Promise<string> {
+    const key = await this.cache.keyFor(path, 'decode');
+    const target = join(await this.cache.directoryFor(key), 'audio.wav');
+    if (existsSync(target)) return target;
+
+    try {
+      await this.sidecar.invoke(['decode', '--input', path, '--out', target]);
+      return target;
+    } catch {
+      return path;
+    }
   }
 
   /** Transcripcion polifonica delegada, cacheada por contenido del archivo. */
