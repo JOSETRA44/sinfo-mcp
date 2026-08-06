@@ -1,4 +1,12 @@
 import { exportScore } from './export.js';
+import {
+  counterpointAdd,
+  melodyGenerate,
+  motifCreate,
+  motifDevelop,
+  motifList,
+  motifWrite,
+} from './generation.js';
 import { analyzeHarmony, checkVoiceLeading, harmonyProgression } from './harmony.js';
 import {
   checkRanges,
@@ -37,23 +45,31 @@ export const ALL_TOOLS: readonly AnyToolDefinition[] = [
   movementAdd,
   timelineSet,
 
-  // 2. componer
+  // 2. material tematico
+  motifCreate,
+  motifDevelop,
+  motifWrite,
+  melodyGenerate,
+  counterpointAdd,
+
+  // 3. componer
   harmonyProgression,
   partWrite,
   partClear,
 
-  // 3. releer y verificar
+  // 4. releer y verificar
   scoreDescribe,
   partRead,
+  motifList,
   timelineDescribe,
   analyzeHarmony,
   checkVoiceLeading,
   checkRanges,
 
-  // 4. sacar el resultado
+  // 5. sacar el resultado
   exportScore,
 
-  // 5. gestion de sesion
+  // 6. gestion de sesion
   scoreList,
   scoreClose,
 ] as AnyToolDefinition[];

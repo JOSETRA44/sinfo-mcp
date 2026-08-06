@@ -430,6 +430,274 @@ describe('obras de varios movimientos', () => {
   });
 });
 
+describe('material tematico', () => {
+  it('crea un motivo y lo guarda en la sesion', async () => {
+    const { scoreId } = await call<{ scoreId: string }>('score_create', { title: 'Tema' });
+
+    const motif = await call<{ motifId: string; notation: string; notes: number }>(
+      'motif_create',
+      { scoreId, notation: 'c4/e d4/e e4/q' },
+    );
+    expect(motif.motifId).toBe('motif-1');
+    expect(motif.notes).toBe(3);
+
+    const listed = await call<{ motifs: { motifId: string }[] }>('motif_list', { scoreId });
+    expect(listed.motifs.map((m) => m.motifId)).toEqual(['motif-1']);
+  });
+
+  it('encadena transformaciones y guarda la genealogia', async () => {
+    const { scoreId } = await call<{ scoreId: string }>('score_create', {
+      title: 'Desarrollo',
+      key: 'C major',
+    });
+    await call('motif_create', { scoreId, notation: 'c4/e d4/e e4/q', motifId: 'tema' });
+
+    const developed = await call<{ motifId: string; derivation: string[]; notation: string }>(
+      'motif_develop',
+      {
+        scoreId,
+        motifId: 'tema',
+        transformations: [
+          { op: 'transpose', interval: 'P5' },
+          { op: 'retrograde' },
+          { op: 'augment', factor: 2 },
+        ],
+      },
+    );
+
+    expect(developed.derivation).toEqual([
+      'origen',
+      'transposicion P5',
+      'retrogradacion',
+      'aumentacion x2',
+    ]);
+    // El original sigue intacto.
+    const original = await call<{ motifs: { motifId: string; notation: string }[] }>(
+      'motif_list',
+      { scoreId },
+    );
+    expect(original.motifs.find((m) => m.motifId === 'tema')!.notation).toBe('C4/e D4/e E4/q');
+  });
+
+  it('la inversion tonal se queda dentro de la tonalidad', async () => {
+    const { scoreId } = await call<{ scoreId: string }>('score_create', {
+      title: 'Inversion',
+      key: 'C major',
+    });
+    await call('motif_create', { scoreId, notation: 'c4/q e4/q g4/q', motifId: 'tema' });
+
+    const inverted = await call<{ notation: string }>('motif_develop', {
+      scoreId,
+      motifId: 'tema',
+      transformations: [{ op: 'invert' }],
+    });
+    expect(inverted.notation).toBe('C4/q A3/q F3/q');
+  });
+
+  it('escribe un motivo en una parte, transportado si se pide', async () => {
+    const { scoreId } = await call<{ scoreId: string }>('score_create', {
+      title: 'Exposicion',
+      instruments: ['violin', 'cello'],
+    });
+    await call('motif_create', { scoreId, notation: 'c4/q e4/q g4/h', motifId: 'tema' });
+
+    await call('motif_write', { scoreId, motifId: 'tema', partId: 'violin' });
+    await call('motif_write', {
+      scoreId,
+      motifId: 'tema',
+      partId: 'cello',
+      transposeTo: '-P8',
+    });
+
+    const violin = await call<{ notation: string }>('part_read', { scoreId, partId: 'violin' });
+    const cello = await call<{ notation: string }>('part_read', { scoreId, partId: 'cello' });
+    expect(violin.notation).toContain('C4/q');
+    expect(cello.notation).toContain('C3/q');
+  });
+
+  it('un motivo inexistente dice cuales hay', async () => {
+    const { scoreId } = await call<{ scoreId: string }>('score_create', { title: 'X' });
+    await call('motif_create', { scoreId, notation: 'c4/q', motifId: 'existe' });
+
+    const error = await callExpectingError('motif_develop', {
+      scoreId,
+      motifId: 'no-existe',
+      transformations: [{ op: 'retrograde' }],
+    });
+    expect(error.code).toBe('NOT_FOUND');
+    expect(error.details?.['available']).toEqual(['existe']);
+  });
+
+  it('una transformacion sin su intervalo lo explica con ejemplos', async () => {
+    const { scoreId } = await call<{ scoreId: string }>('score_create', { title: 'X' });
+    await call('motif_create', { scoreId, notation: 'c4/q', motifId: 'tema' });
+
+    const error = await callExpectingError('motif_develop', {
+      scoreId,
+      motifId: 'tema',
+      transformations: [{ op: 'transpose' }],
+    });
+    expect(error.details?.['examples']).toContain('P5');
+  });
+});
+
+describe('generacion de melodia', () => {
+  it('genera y la escribe en una parte', async () => {
+    const { scoreId } = await call<{ scoreId: string }>('score_create', {
+      title: 'Melodia',
+      key: 'C major',
+      instruments: ['flute'],
+    });
+
+    const result = await call<{
+      seed: string;
+      notes: number;
+      writtenTo: string;
+      motifId: string;
+    }>('melody_generate', {
+      scoreId,
+      partId: 'flute',
+      measures: 4,
+      progression: ['I', 'vi', 'ii', 'V7'],
+      contour: 'arch',
+      seed: 'melodia-test',
+    });
+
+    expect(result.writtenTo).toBe('flute');
+    expect(result.notes).toBeGreaterThan(0);
+    expect(result.seed).toBe('melodia-test');
+
+    const described = await call<{ summary: { eventCount: number } }>('score_describe', { scoreId });
+    expect(described.summary.eventCount).toBe(result.notes);
+  });
+
+  // La razon de ser de la semilla: poder repetir lo que gusto.
+  it('la misma semilla da exactamente la misma melodia', async () => {
+    const generate = async (): Promise<string> => {
+      const { scoreId } = await call<{ scoreId: string }>('score_create', {
+        title: 'Repetible',
+        key: 'D minor',
+      });
+      const result = await call<{ notation: string }>('melody_generate', {
+        scoreId,
+        measures: 4,
+        seed: 'identica',
+      });
+      return result.notation;
+    };
+
+    expect(await generate()).toBe(await generate());
+  });
+
+  it('toma el rango de la tesitura del instrumento', async () => {
+    const { scoreId } = await call<{ scoreId: string }>('score_create', {
+      title: 'Rango',
+      instruments: ['contrabass'],
+    });
+    await call('melody_generate', { scoreId, partId: 'contrabass', measures: 4, seed: 'grave' });
+
+    // Nada fuera de rango: el generador respeto la tesitura sin que se le diga.
+    const check = await call<{ issueCount: number }>('check_ranges', { scoreId });
+    expect(check.issueCount).toBe(0);
+  });
+
+  it('se queda en la escala pedida', async () => {
+    const { scoreId } = await call<{ scoreId: string }>('score_create', {
+      title: 'Pentatonica',
+      key: 'C major',
+    });
+    const result = await call<{ notation: string }>('melody_generate', {
+      scoreId,
+      measures: 4,
+      scaleType: 'majorPentatonic',
+      seed: 'penta',
+    });
+
+    // La pentatonica mayor de Do no tiene ni Fa ni Si.
+    expect(result.notation).not.toMatch(/\bF\d/);
+    expect(result.notation).not.toMatch(/\bB\d/);
+  });
+});
+
+describe('contrapunto', () => {
+  it('escribe una voz contra otra sin paralelas', async () => {
+    const { scoreId } = await call<{ scoreId: string }>('score_create', {
+      title: 'Contrapunto',
+      key: 'C major',
+      instruments: ['cello', 'violin'],
+    });
+    await call('part_write', {
+      scoreId,
+      partId: 'cello',
+      notation: 'c4/w | d4/w | e4/w | c4/w | f4/w | e4/w | d4/w | c4/w',
+    });
+
+    const result = await call<{
+      writtenTo: string;
+      notes: number;
+      strict: boolean;
+      relaxed: string[];
+    }>('counterpoint_add', {
+      scoreId,
+      sourcePartId: 'cello',
+      targetPartId: 'violin',
+      seed: 'cp-mcp',
+    });
+
+    expect(result.writtenTo).toBe('violin');
+    expect(result.notes).toBe(8);
+
+    // Y lo generado pasa el mismo analizador que critica lo escrito a mano.
+    const check = await call<{ byRule: Record<string, number> }>('check_voice_leading', {
+      scoreId,
+    });
+    expect(check.byRule['quintas-paralelas']).toBeUndefined();
+    expect(check.byRule['octavas-paralelas']).toBeUndefined();
+  });
+
+  it('avisa si tuvo que ceder reglas de estilo', async () => {
+    const { scoreId } = await call<{ scoreId: string }>('score_create', {
+      title: 'Estrecho',
+      key: 'C major',
+      instruments: ['cello', 'violin'],
+    });
+    await call('part_write', {
+      scoreId,
+      partId: 'cello',
+      notation: 'c4/w | d4/w | e4/w | f4/w | g4/w',
+    });
+
+    const result = await call<{ strict: boolean; relaxed: string[]; notes: number }>(
+      'counterpoint_add',
+      {
+        scoreId,
+        sourcePartId: 'cello',
+        targetPartId: 'violin',
+        lowest: 'C5',
+        highest: 'E5',
+        seed: 'apretado',
+      },
+    );
+
+    expect(result.notes).toBe(5);
+    if (!result.strict) expect(result.relaxed.length).toBeGreaterThan(0);
+  });
+
+  it('rechaza contrapuntar una parte vacia', async () => {
+    const { scoreId } = await call<{ scoreId: string }>('score_create', {
+      title: 'Vacia',
+      instruments: ['cello', 'violin'],
+    });
+
+    const error = await callExpectingError('counterpoint_add', {
+      scoreId,
+      sourcePartId: 'cello',
+      targetPartId: 'violin',
+    });
+    expect(error.code).toBe('INVALID_REQUEST');
+  });
+});
+
 describe('armonia', () => {
   it('realiza una progresion de numeros romanos', async () => {
     const { scoreId } = await call<{ scoreId: string }>('score_create', {
