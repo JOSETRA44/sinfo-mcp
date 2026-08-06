@@ -14,6 +14,7 @@ export type DomainErrorCode =
   | 'INVALID_TEMPO'
   | 'INVALID_KEY'
   | 'INVALID_STRUCTURE'
+  | 'INVALID_PERFORMANCE'
   | 'NOT_FOUND';
 
 export class DomainError extends Error {
