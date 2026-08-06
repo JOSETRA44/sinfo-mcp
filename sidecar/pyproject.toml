@@ -1,0 +1,40 @@
+[project]
+name = "sinfo-mir"
+version = "0.1.0"
+description = "Sidecar de analisis musical para sinfo-mcp: separacion de pistas, seguimiento de pulso y transcripcion polifonica."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+
+# El paquete base NO trae ningun modelo. Se instala en segundos y sirve para
+# que `describe` pueda decir que hay y que falta. Los modelos pesan gigabytes y
+# se instalan a proposito, por extras, nunca de rebote.
+dependencies = []
+
+[project.optional-dependencies]
+# Seguimiento de pulso y compas. Beat This! es MIT en codigo Y en pesos, a
+# diferencia de madmom, cuyos pesos preentrenados son CC BY-NC-SA y por tanto
+# de uso no comercial: es la libreria que todo el mundo usa por inercia y que
+# ataria de pies y manos a quien construya algo encima.
+beats = ["beat-this @ git+https://github.com/CPJKU/beat_this.git", "torch>=2.0", "soundfile>=0.12"]
+
+# Separacion en pistas. Demucs es MIT, de Meta, y sigue siendo la referencia
+# practica para 4 y 6 pistas.
+separate = ["demucs>=4.0", "torch>=2.0", "soundfile>=0.12"]
+
+# Transcripcion polifonica y multi-instrumento.
+notes = ["basic-pitch>=0.4", "soundfile>=0.12"]
+
+all = ["sinfo-mir[beats,separate,notes]"]
+
+[project.scripts]
+sinfo-mir = "sinfo_mir.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/sinfo_mir"]
+[tool.hatch.metadata]
+allow-direct-references = true
