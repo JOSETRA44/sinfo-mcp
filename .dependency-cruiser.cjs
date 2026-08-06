@@ -18,20 +18,42 @@
  */
 
 /** Capas ordenadas de adentro hacia afuera. */
-const LAYERS = ['core', 'theory', 'generate', 'engine', 'render', 'mcp'];
+const LAYERS = [
+  'core',
+  'theory',
+  'perform',
+  'transcribe',
+  'generate',
+  'engine',
+  'render',
+  'mir',
+  'mcp',
+];
 
 /** Cada capa solo puede importar de las capas listadas. */
 const ALLOWED = {
   core: [],
   theory: ['core'],
+  // `perform` describe una interpretacion cruda: segundos y alturas continuas.
+  // No conoce la teoria a proposito, porque lo que llega de un modelo todavia
+  // no es musica escrita y tratarlo como si lo fuera es el error de origen.
+  perform: ['core'],
+  // `transcribe` es la mitad simbolica: convierte esa interpretacion en
+  // notacion. Necesita la teoria para la ortografia de alteraciones.
+  transcribe: ['core', 'theory', 'perform'],
   generate: ['core', 'theory'],
-  engine: ['core', 'theory', 'generate'],
+  engine: ['core', 'theory', 'perform', 'transcribe', 'generate'],
   // render puede usar theory y generate: son capas MAS INTERNAS, asi que la
   // flecha sigue apuntando hacia dentro. El groove es un ejemplo: es
   // interpretacion y se aplica al exportar, pero necesita el PRNG determinista
   // y la aritmetica musical que viven ahi.
-  render: ['core', 'theory', 'generate', 'engine'],
-  mcp: ['core', 'theory', 'generate', 'engine', 'render'],
+  render: ['core', 'theory', 'perform', 'generate', 'engine'],
+  // `mir` es el adaptador de ENTRADA y `render` el de salida: son hermanos, no
+  // se conocen. Que `mir` no pueda importar de `render` es deliberado; si
+  // alguna vez necesita algo de ahi, es que ese algo pertenecia a una capa
+  // interior y hay que moverlo, no abrir la puerta.
+  mir: ['core', 'theory', 'perform', 'transcribe', 'generate', 'engine'],
+  mcp: ['core', 'theory', 'perform', 'transcribe', 'generate', 'engine', 'render', 'mir'],
 };
 
 /** Genera una regla por cada par (capa, capa-prohibida). */

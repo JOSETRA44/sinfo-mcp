@@ -9,6 +9,12 @@
       "path": "./packages/theory"
     },
     {
+      "path": "./packages/perform"
+    },
+    {
+      "path": "./packages/transcribe"
+    },
+    {
       "path": "./packages/generate"
     },
     {
@@ -16,6 +22,9 @@
     },
     {
       "path": "./packages/render"
+    },
+    {
+      "path": "./packages/mir"
     },
     {
       "path": "./packages/mcp"

@@ -13,9 +13,12 @@ export default defineConfig({
     alias: {
       '@sinfo/core': pkg('core'),
       '@sinfo/theory': pkg('theory'),
+      '@sinfo/perform': pkg('perform'),
+      '@sinfo/transcribe': pkg('transcribe'),
       '@sinfo/generate': pkg('generate'),
       '@sinfo/engine': pkg('engine'),
       '@sinfo/render': pkg('render'),
+      '@sinfo/mir': pkg('mir'),
       'sinfo-mcp': pkg('mcp'),
     },
   },
