@@ -23,6 +23,7 @@
   "dependencies": {
     "@sinfo/core": "0.1.0",
     "@sinfo/perform": "0.1.0",
+    "@sinfo/engine": "0.1.0",
     "midi-file": "^1.2.4"
   }
 }
