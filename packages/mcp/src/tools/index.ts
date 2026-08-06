@@ -34,7 +34,7 @@ import {
   timelineDescribe,
   timelineSet,
 } from './score.js';
-import { importMidi, transcribeRequantize } from './transcribe.js';
+import { importAudio, importMidi, transcribeRequantize } from './transcribe.js';
 import type { AnyToolDefinition } from './types.js';
 
 /**
@@ -54,6 +54,7 @@ export const ALL_TOOLS: readonly AnyToolDefinition[] = [
   // obra en blanco, se parte de algo que ya suena. Lo que sale es un scoreId
   // corriente, asi que todo lo de abajo se le aplica igual.
   importMidi,
+  importAudio,
   transcribeRequantize,
 
   // 1. abrir y estructurar

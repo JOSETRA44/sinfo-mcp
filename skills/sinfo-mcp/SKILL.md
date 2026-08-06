@@ -45,6 +45,19 @@ No es una conversión mecánica. El archivo trae tiempos medidos —y si se grab
 - Las alteraciones están escritas al revés → impón `key`
 - Un 6/8 salió como 3/4 → impón `timeSignature` (miden lo mismo; los tiempos fuertes no los distinguen)
 
+## Transcribir audio
+
+`import_audio path:"..." bpm:120 instrumentId:"alto_sax"` escucha un WAV y saca las notas.
+
+**Es monofónico, y eso decide cuándo sirve.** Detecta una altura por instante: va bien con una línea sola —voz, saxo, flauta, violín, bajo, un silbido— y **no** con acordes de piano, guitarra rasgueada ni canciones enteras. Ante un acorde devuelve una sola nota. Si el usuario trae una mezcla completa, dilo antes de gastar la llamada; no es un fallo que se arregle con otros parámetros.
+
+Dos argumentos cambian el resultado más que ningún otro:
+
+- **`bpm`** — el audio no trae mapa de tempo. Sin él hay que suponer 120 y el ritmo sale mal salvo casualidad. Si el usuario no lo sabe, que lo cuente con un metrónomo.
+- **`instrumentId`** — acota la búsqueda al registro real de ese instrumento. Es la mejor defensa contra los errores de octava, que son el fallo más común de cualquier transcriptor.
+
+Solo WAV sin comprimir. MP3 y OGG hay que convertirlos antes: un decodificador de formatos comprimidos sería una dependencia nativa, y este servidor las evita a propósito.
+
 ## SinfoScript: la notación
 
 Es el formato de `part_write` y de todo lo que devuelve `part_read`.

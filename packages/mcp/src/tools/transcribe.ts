@@ -93,6 +93,62 @@ export const importMidi = defineTool({
     }),
 });
 
+export const importAudio = defineTool({
+  name: 'import_audio',
+  title: 'Transcribir un archivo de audio a partitura',
+  description:
+    'Escucha un WAV y saca las notas, devolviendo un scoreId como cualquier otra partitura.\n\n' +
+    'IMPORTANTE, porque cambia por completo cuando sirve: es MONOFONICO. Detecta una altura ' +
+    'por instante, asi que funciona bien con una linea sola —voz, saxo, flauta, violin, bajo, ' +
+    'silbido— y NO con acordes de piano, guitarra rasgueada ni mezclas completas. Ante un ' +
+    'acorde devuelve una sola nota. Si el usuario trae una cancion entera, dilo antes de ' +
+    'gastar la llamada.\n\n' +
+    'Pasa SIEMPRE el tempo si lo sabes: el audio no trae mapa de tempo y sin el hay que ' +
+    'suponer 120, lo que descuadra el ritmo entero. Pasa tambien instrumentId cuando lo ' +
+    'conozcas: acota el registro de busqueda y elimina errores de octava.\n\n' +
+    'Solo WAV sin comprimir. MP3 y OGG necesitan un decodificador nativo que este servidor ' +
+    'evita a proposito; hay que convertirlos antes.',
+  inputSchema: {
+    path: z.string().min(1).describe('Ruta al archivo .wav en el disco de la persona.'),
+    bpm: z
+      .number()
+      .min(20)
+      .max(400)
+      .optional()
+      .describe(
+        'Tempo real de la grabacion, en negras por minuto. Sin esto el ritmo sale mal salvo ' +
+          'casualidad. Si el usuario no lo sabe, dile que lo cuente con un metronomo.',
+      ),
+    instrumentId: z
+      .string()
+      .optional()
+      .describe(
+        'Que instrumento suena, por id del catalogo (instruments_list). Acota la busqueda a su ' +
+          'registro real, que es la mejor defensa contra los errores de octava.',
+      ),
+    title: z.string().optional(),
+    composer: z.string().optional(),
+    ...quantizeShape,
+  },
+  hints: { readOnlyHint: false, idempotentHint: false },
+  handler: (args, { service }) =>
+    service.importFile(
+      args.path,
+      {
+        ...toOptions(args),
+        ...(args.title === undefined ? {} : { title: args.title }),
+        ...(args.composer === undefined ? {} : { composer: args.composer }),
+        ...(args.instrumentId === undefined
+          ? {}
+          : { defaultInstrument: args.instrumentId }),
+      },
+      {
+        ...(args.bpm === undefined ? {} : { bpm: args.bpm }),
+        ...(args.instrumentId === undefined ? {} : { instrumentId: args.instrumentId }),
+      },
+    ),
+});
+
 export const transcribeRequantize = defineTool({
   name: 'transcribe_requantize',
   title: 'Volver a cuantizar una transcripcion con otros parametros',

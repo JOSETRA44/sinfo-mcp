@@ -1,6 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { ScoreService, type ArtifactSink, type EnginePorts } from '@sinfo/engine';
-import { MidiFileLoader } from '@sinfo/mir';
+import { FileLoader } from '@sinfo/mir';
 import { MidiFileRenderer, VerovioRenderer, WavRenderer } from '@sinfo/render';
 import { FileArtifactSink } from './adapters/file-sink.js';
 import { ok, toolError } from './result.js';
@@ -30,7 +30,7 @@ export function createPorts(options: CreateServerOptions = {}): EnginePorts {
     sink: options.sink ?? options.ports?.sink ?? new FileArtifactSink(),
     score: options.ports?.score ?? new VerovioRenderer(),
     audio: options.ports?.audio ?? new WavRenderer(),
-    loader: options.ports?.loader ?? new MidiFileLoader(),
+    loader: options.ports?.loader ?? new FileLoader(),
   };
 }
 
