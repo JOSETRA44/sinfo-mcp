@@ -41,3 +41,18 @@ export {
   type CounterpointResult,
   type Species,
 } from './counterpoint.js';
+
+export {
+  assignRoles,
+  checkBalance,
+  distributeChord,
+  fitToRange,
+  materialFor,
+  type AssignRolesOptions,
+  type BalanceReport,
+  type OrchestrationCandidate,
+  type OrchestrationStyle,
+  type RangeFit,
+  type RoleAssignment,
+  type TextureRole,
+} from './orchestration.js';
