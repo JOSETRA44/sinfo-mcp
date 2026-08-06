@@ -31,6 +31,13 @@ export class FileLoader implements PerformanceLoader {
     return this.loaders.some((loader) => loader.accepts(path));
   }
 
+  async status(): Promise<Readonly<Record<string, unknown>>> {
+    const sources = await Promise.all(
+      this.loaders.map(async (loader) => (await loader.status?.()) ?? { kind: 'desconocido' }),
+    );
+    return { capabilities: this.capabilities, sources };
+  }
+
   async load(path: string, options: LoadPerformanceOptions = {}): Promise<Performance> {
     const loader = this.loaders.find((candidate) => candidate.accepts(path));
     if (loader === undefined) {

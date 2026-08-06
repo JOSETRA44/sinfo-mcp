@@ -47,16 +47,28 @@ No es una conversión mecánica. El archivo trae tiempos medidos —y si se grab
 
 ## Transcribir audio
 
-`import_audio path:"..." bpm:120 instrumentId:"alto_sax"` escucha un WAV y saca las notas.
+**Llama a `mir_status` antes de prometer nada.** Lo que esta instalación puede hacer con audio depende de si hay un sidecar opcional instalado, y la diferencia es grande:
 
-**Es monofónico, y eso decide cuándo sirve.** Detecta una altura por instante: va bien con una línea sola —voz, saxo, flauta, violín, bajo, un silbido— y **no** con acordes de piano, guitarra rasgueada ni canciones enteras. Ante un acorde devuelve una sola nota. Si el usuario trae una mezcla completa, dilo antes de gastar la llamada; no es un fallo que se arregle con otros parámetros.
+| | Sin sidecar | Con sidecar |
+|---|---|---|
+| Motor | YIN, propio | Basic Pitch |
+| Polifonía | **No** — una nota por instante | Sí |
+| Tempo | Hay que declararlo | Se detecta |
+
+Sin sidecar, `import_audio` va bien con **una línea sola** —voz, saxo, flauta, violín, bajo, un silbido— y **no** con acordes de piano, guitarra rasgueada ni canciones enteras: ante un acorde devuelve una sola nota. Si el usuario trae una mezcla completa, dilo antes de gastar la llamada. No se arregla con otros parámetros; `mir_status` trae el comando de instalación exacto.
+
+```
+import_audio path:"solo.wav" bpm:120 instrumentId:"alto_sax"
+```
 
 Dos argumentos cambian el resultado más que ningún otro:
 
-- **`bpm`** — el audio no trae mapa de tempo. Sin él hay que suponer 120 y el ritmo sale mal salvo casualidad. Si el usuario no lo sabe, que lo cuente con un metrónomo.
-- **`instrumentId`** — acota la búsqueda al registro real de ese instrumento. Es la mejor defensa contra los errores de octava, que son el fallo más común de cualquier transcriptor.
+- **`bpm`** — el audio no trae mapa de tempo. Sin sidecar y sin este dato hay que suponer 120, y el ritmo sale mal salvo casualidad. Si el usuario no lo sabe, que lo cuente con un metrónomo.
+- **`instrumentId`** — acota la búsqueda al registro real de ese instrumento. Es la mejor defensa contra los errores de octava, el fallo más común de cualquier transcriptor.
 
 Solo WAV sin comprimir. MP3 y OGG hay que convertirlos antes: un decodificador de formatos comprimidos sería una dependencia nativa, y este servidor las evita a propósito.
+
+Los resultados caros se cachean por **contenido** del archivo, así que reintentar sobre el mismo audio es instantáneo — y renombrarlo no engaña a la caché.
 
 ## SinfoScript: la notación
 

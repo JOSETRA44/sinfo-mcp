@@ -27,6 +27,15 @@ export class MidiFileLoader implements PerformanceLoader {
     return MIDI_EXTENSIONS.has(extname(path).toLowerCase());
   }
 
+  async status(): Promise<Readonly<Record<string, unknown>>> {
+    return {
+      kind: 'midi',
+      extensions: [...MIDI_EXTENSIONS],
+      available: true,
+      note: 'Siempre disponible: no depende de nada instalado aparte.',
+    };
+  }
+
   async load(path: string, options: LoadPerformanceOptions = {}): Promise<Performance> {
     const extension = extname(path).toLowerCase();
     if (!MIDI_EXTENSIONS.has(extension)) {

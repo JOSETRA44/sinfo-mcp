@@ -173,5 +173,14 @@ export interface PerformanceLoader {
    */
   accepts(path: string): boolean;
   load(path: string, options?: LoadPerformanceOptions): Promise<Performance>;
+  /**
+   * Diagnostico libre: que sabe leer, que le falta y como se arregla.
+   *
+   * Existe porque las capacidades de entrada dependen de cosas instaladas
+   * FUERA del paquete, y el agente no puede adivinarlas. Sin esto, la unica
+   * forma de saber si hay transcripcion polifonica seria intentarla y ver si
+   * falla, gastando una llamada para averiguar algo que se puede preguntar.
+   */
+  status?(): Promise<Readonly<Record<string, unknown>>>;
 }
 

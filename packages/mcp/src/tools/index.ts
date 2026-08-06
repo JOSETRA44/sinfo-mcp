@@ -34,7 +34,7 @@ import {
   timelineDescribe,
   timelineSet,
 } from './score.js';
-import { importAudio, importMidi, transcribeRequantize } from './transcribe.js';
+import { importAudio, importMidi, mirStatus, transcribeRequantize } from './transcribe.js';
 import type { AnyToolDefinition } from './types.js';
 
 /**
@@ -53,6 +53,7 @@ export const ALL_TOOLS: readonly AnyToolDefinition[] = [
   // Va primero porque es una forma alternativa de EMPEZAR: en vez de abrir una
   // obra en blanco, se parte de algo que ya suena. Lo que sale es un scoreId
   // corriente, asi que todo lo de abajo se le aplica igual.
+  mirStatus,
   importMidi,
   importAudio,
   transcribeRequantize,

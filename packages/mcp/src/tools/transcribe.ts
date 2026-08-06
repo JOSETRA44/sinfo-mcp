@@ -149,6 +149,21 @@ export const importAudio = defineTool({
     ),
 });
 
+export const mirStatus = defineTool({
+  name: 'mir_status',
+  title: 'Que puede leer esta instalacion',
+  description:
+    'Dice que formatos se saben leer, con que motor y que hace falta instalar para lo que ' +
+    'falta. Consultalo ANTES de prometerle al usuario una transcripcion de audio: la ' +
+    'diferencia entre tener el sidecar y no tenerlo es la diferencia entre poder con un piano ' +
+    'y poder solo con una linea melodica sola.\n\n' +
+    'Tambien informa de lo que hay en cache, que es lo que hace que reintentar sobre el mismo ' +
+    'archivo sea instantaneo en vez de costar otros minutos.',
+  inputSchema: {},
+  hints: { readOnlyHint: true, idempotentHint: true },
+  handler: (_args, { service }) => service.inputStatus(),
+});
+
 export const transcribeRequantize = defineTool({
   name: 'transcribe_requantize',
   title: 'Volver a cuantizar una transcripcion con otros parametros',

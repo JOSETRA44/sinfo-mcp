@@ -16,7 +16,17 @@ export { readMidi } from './midi/reader.js';
 export { MidiFileLoader } from './loader.js';
 export { FileLoader } from './file-loader.js';
 
+export type { AudioLoaderOptions } from './audio/loader.js';
 export { AudioFileLoader } from './audio/loader.js';
+
+export type {
+  SidecarCapability,
+  SidecarInfo,
+  SidecarOptions,
+} from './sidecar/client.js';
+export { SidecarClient, SidecarError } from './sidecar/client.js';
+export type { CacheStats, StageCacheOptions } from './sidecar/cache.js';
+export { StageCache } from './sidecar/cache.js';
 export { decodeWav, WavDecodeError } from './audio/wav.js';
 export type { PitchPoint, YinOptions } from './audio/yin.js';
 export { detectPitch } from './audio/yin.js';
