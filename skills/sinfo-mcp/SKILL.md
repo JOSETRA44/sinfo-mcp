@@ -70,6 +70,16 @@ Solo WAV sin comprimir. MP3 y OGG hay que convertirlos antes: un decodificador d
 
 Los resultados caros se cachean por **contenido** del archivo, así que reintentar sobre el mismo audio es instantáneo — y renombrarlo no engaña a la caché.
 
+### Depuración con criterio musical
+
+Lo que devuelve un modelo de audio se limpia antes de escribirlo, usando lo que el modelo no sabe:
+
+- **Armónicos falsos.** Una nota que entra a la vez que otra más grave y más fuerte, a distancia de octava, doceava o quincena, casi siempre es su armónico. Es el fallo más común de la transcripción de audio. **Desactívalo con `dropHarmonics: false` si la obra dobla la melodía en octavas de verdad**, o perderás la voz de arriba.
+- **Trozos de una misma nota.** Los modelos parten una nota tenida cuando la intensidad flaquea a mitad; se funden.
+- **Errores de octava.** Con `instrumentId` declarado, una nota fuera del registro se desplaza a la octava que sí cabe. Ningún transcriptor genérico puede hacer esto porque ninguno lleva catálogo de instrumentos.
+
+Todo lo eliminado se cuenta y se explica en `warnings`. Si algo suena mal, míralos antes de repetir la transcripción: lo más probable es que un filtro se haya pasado de listo, y se apaga.
+
 ## SinfoScript: la notación
 
 Es el formato de `part_write` y de todo lo que devuelve `part_read`.
