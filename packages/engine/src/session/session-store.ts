@@ -1,5 +1,6 @@
 import type { Score } from '@sinfo/core';
 import type { Motif } from '@sinfo/generate';
+import type { Performance } from '@sinfo/perform';
 import { fail } from '../errors.js';
 
 export interface ScoreSession {
@@ -15,6 +16,15 @@ export interface ScoreSession {
    * gusta, sin reenviar las notas en cada paso.
    */
   readonly motifs: Map<string, Motif>;
+  /**
+   * Interpretacion de la que salio la partitura, si vino de una transcripcion.
+   *
+   * Se guarda para poder volver a cuantizar sin releer nada. Importa mas de lo
+   * que parece: afinar la cuantizacion es prueba y error —mas o menos
+   * subdivision, ligar o medir los silencios— y sin esto cada intento
+   * obligaria a repetir la lectura entera del archivo.
+   */
+  performance?: Performance | undefined;
 }
 
 /**

@@ -1,12 +1,14 @@
 import type { Score } from '@sinfo/core';
+import type { Performance } from '@sinfo/perform';
 
 /**
- * Puertos de salida.
+ * Puertos de entrada y de salida.
  *
- * Los define la capa de aplicacion y los implementa @sinfo/render. La flecha
- * de dependencia va de render hacia engine, nunca al reves: el motor no sabe
- * que existe midi-file, ni verovio, ni ningun sintetizador. Cambiar de
- * libreria es cambiar un adaptador, no tocar la logica.
+ * Los define la capa de aplicacion y los implementan @sinfo/render (salida) y
+ * @sinfo/mir (entrada). La flecha de dependencia va de los adaptadores hacia
+ * engine, nunca al reves: el motor no sabe que existe midi-file, ni verovio,
+ * ni ningun sintetizador. Cambiar de libreria es cambiar un adaptador, no
+ * tocar la logica.
  */
 
 export type ExportFormat =
@@ -112,10 +114,38 @@ export interface ArtifactSink {
  * SoundFont instalado, ofreciendo lo que si puede hacer en vez de fallar
  * entero.
  */
-export interface RenderPorts {
+export interface EnginePorts {
   readonly midi: MidiRenderer;
   readonly sink: ArtifactSink;
   readonly score?: ScoreRenderer;
   readonly audio?: AudioRenderer;
+  readonly loader?: PerformanceLoader;
+}
+
+// -------------------------------------------------------- puertos de ENTRADA
+
+/** Que sabe leer un cargador. Se declara igual que `formats` en los de salida. */
+export type PerformanceCapability = 'midi' | 'audio';
+
+export interface LoadPerformanceOptions {
+  /** Nombre para la procedencia; por defecto, el del archivo. */
+  readonly name?: string | undefined;
+}
+
+/**
+ * Trae material de fuera y lo entrega como interpretacion cruda.
+ *
+ * Devuelve `Performance` y no `Score` a proposito, y esa es la decision de
+ * diseno de toda la fase. Lo que sale de un archivo MIDI o de un modelo de
+ * audio son notas medidas en segundos: todavia no es musica escrita. Convertir
+ * eso en notacion —cuantizar, elegir grafias, separar voces— es un trabajo
+ * distinto, deterministico y probado aparte, que ocurre despues.
+ *
+ * Gracias a esa separacion, anadir transcripcion de audio no toca nada de lo
+ * que hay aqui: es otro cargador que produce el mismo tipo.
+ */
+export interface PerformanceLoader {
+  readonly capabilities: readonly PerformanceCapability[];
+  load(path: string, options?: LoadPerformanceOptions): Promise<Performance>;
 }
 

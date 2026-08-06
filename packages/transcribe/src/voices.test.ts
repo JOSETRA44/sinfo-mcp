@@ -63,14 +63,38 @@ describe('separateVoices', () => {
     expect(low?.every((group) => (group.midis[0] ?? 0) < 60)).toBe(true);
   });
 
-  it('funde en acorde dos lineas paralelas de ritmo identico', () => {
-    // Mismo ataque y misma duracion es un acorde, no dos voces. Para una parte
-    // de un solo instrumento es la escritura correcta.
+  it('funde en acorde lo que cabe en una mano', () => {
+    // Mismo ataque, misma duracion y a distancia de acorde: es un acorde.
     const notes: QuantizedNote[] = [];
-    for (let i = 0; i < 4; i += 1) notes.push(note(i, 1, 72), note(i, 1, 60));
+    for (let i = 0; i < 4; i += 1) notes.push(note(i, 1, 67), note(i, 1, 60));
     const voices = separateVoices(notes);
     expect(voices).toHaveLength(1);
-    expect(shape(voices)[0]?.[0]).toEqual([60, 72]);
+    expect(shape(voices)[0]?.[0]).toEqual([60, 67]);
+  });
+
+  it('NO funde melodia y bajo aunque caigan a la vez', () => {
+    // El caso del vals de piano: melodia y bajo coinciden en el primer tiempo
+    // de cada compas. Fundirlos daria un acorde de dos octavas de ancho en vez
+    // de las dos lineas que son, y ningun copista lo escribiria asi.
+    const notes: QuantizedNote[] = [];
+    for (let i = 0; i < 4; i += 1) notes.push(note(i, 1, 82), note(i, 1, 46));
+
+    const voices = separateVoices(notes);
+    expect(voices).toHaveLength(2);
+    expect(voices[0]?.every((group) => group.midis.length === 1)).toBe(true);
+    expect(voices[1]?.every((group) => group.midis.length === 1)).toBe(true);
+  });
+
+  it('parte el acorde solo por el hueco, conservando los racimos', () => {
+    // Tres notas juntas abajo y una suelta muy arriba: acorde y linea, no un
+    // unico bloque ni cuatro voces sueltas.
+    const voices = separateVoices([
+      note(0, 1, 48),
+      note(0, 1, 52),
+      note(0, 1, 55),
+      note(0, 1, 84),
+    ]);
+    expect(shape(voices)).toEqual([[[84]], [[48, 52, 55]]]);
   });
 
   it('ninguna voz se solapa consigo misma, que es el invariante de Voice', () => {

@@ -38,9 +38,19 @@ export interface SeparateOptions {
    * aunque las voces se enreden.
    */
   readonly crossingPenalty?: number | undefined;
+  /**
+   * Distancia maxima, en semitonos, entre dos notas contiguas de un acorde.
+   *
+   * Coincidir en el tiempo no basta para ser un acorde. En un vals de piano la
+   * melodia y el bajo caen juntos en el primer tiempo de cada compas, y
+   * fundirlos daria un acorde de dos octavas de ancho en vez de las dos lineas
+   * que son. Un acorde es lo que abarca una mano; mas alla de eso, y sin nada
+   * en medio, son voces distintas.
+   */
+  readonly maxChordGap?: number | undefined;
 }
 
-const DEFAULTS = { maxVoices: 4, crossingPenalty: 12 } as const;
+const DEFAULTS = { maxVoices: 4, crossingPenalty: 12, maxChordGap: 12 } as const;
 
 /**
  * Reparte las notas en voces, cada una una sucesion sin solapes.
@@ -55,7 +65,7 @@ export function separateVoices(
   const maxVoices = options.maxVoices ?? DEFAULTS.maxVoices;
   const crossingPenalty = options.crossingPenalty ?? DEFAULTS.crossingPenalty;
 
-  const groups = mergeChords(notes);
+  const groups = mergeChords(notes, options.maxChordGap ?? DEFAULTS.maxChordGap);
   if (groups.length === 0) return [];
 
   const voices: NoteGroup[][] = [];
@@ -133,7 +143,7 @@ export function separateVoices(
  * robaria la duracion a uno de los dos. Al quedar en voces distintas, cada uno
  * conserva la suya.
  */
-function mergeChords(notes: readonly QuantizedNote[]): NoteGroup[] {
+function mergeChords(notes: readonly QuantizedNote[], maxChordGap: number): NoteGroup[] {
   const buckets = new Map<string, QuantizedNote[]>();
   for (const note of notes) {
     const key = `${note.position.toString()}|${note.duration.toString()}`;
@@ -144,23 +154,40 @@ function mergeChords(notes: readonly QuantizedNote[]): NoteGroup[] {
 
   const groups: NoteGroup[] = [];
   for (const bucket of buckets.values()) {
-    const first = bucket[0];
-    if (first === undefined) continue;
-    const midis = bucket.map((note) => note.midi).sort((a, b) => a - b);
-    groups.push({
-      position: first.position,
-      duration: first.duration,
-      midis,
-      velocity: Math.round(
-        bucket.reduce((sum, note) => sum + note.velocity, 0) / bucket.length,
-      ),
-      confidence: Math.min(...bucket.map((note) => note.confidence)),
-    });
+    bucket.sort((a, b) => a.midi - b.midi);
+
+    // Se parte alli donde se abre un hueco mayor que el alcance de una mano:
+    // lo de arriba y lo de abajo son lineas distintas, no un acorde.
+    let cluster: QuantizedNote[] = [];
+    for (const note of bucket) {
+      const previous = cluster[cluster.length - 1];
+      if (previous !== undefined && note.midi - previous.midi > maxChordGap) {
+        groups.push(toGroup(cluster));
+        cluster = [];
+      }
+      cluster.push(note);
+    }
+    if (cluster.length > 0) groups.push(toGroup(cluster));
   }
 
   return groups.sort(
     (a, b) => a.position.compare(b.position) || (a.midis[0] ?? 0) - (b.midis[0] ?? 0),
   );
+}
+
+/** Convierte un grupo de notas simultaneas y vecinas en un solo ataque. */
+function toGroup(cluster: readonly QuantizedNote[]): NoteGroup {
+  const first = cluster[0];
+  if (first === undefined) {
+    throw new Error('toGroup no admite grupos vacios');
+  }
+  return {
+    position: first.position,
+    duration: first.duration,
+    midis: cluster.map((note) => note.midi),
+    velocity: Math.round(cluster.reduce((sum, note) => sum + note.velocity, 0) / cluster.length),
+    confidence: Math.min(...cluster.map((note) => note.confidence)),
+  };
 }
 
 /**

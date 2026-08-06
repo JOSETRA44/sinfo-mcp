@@ -10,6 +10,8 @@ import {
   type CreateScoreInput,
 } from './operations/structure.js';
 import { exportScore, type ExportInput } from './operations/exporting.js';
+import { importPerformance } from './operations/importing.js';
+import type { ToScoreOptions } from '@sinfo/transcribe';
 import {
   addEnsemble,
   listEnsembles,
@@ -50,7 +52,7 @@ import {
 } from './operations/reading.js';
 import { setTimeline, type SetTimelineInput } from './operations/timeline.js';
 import { clearPart, writePart, type ClearPartInput, type WritePartInput } from './operations/writing.js';
-import type { RenderPorts } from './ports.js';
+import type { EnginePorts } from './ports.js';
 import { InMemorySessionStore, recordAction, type SessionStore } from './session/session-store.js';
 
 export interface ScoreServiceOptions {
@@ -70,10 +72,10 @@ export interface ScoreServiceOptions {
  */
 export class ScoreService {
   private readonly store: SessionStore;
-  private readonly ports: RenderPorts;
+  private readonly ports: EnginePorts;
   private readonly generateId: () => string;
 
-  constructor(ports: RenderPorts, options: ScoreServiceOptions = {}) {
+  constructor(ports: EnginePorts, options: ScoreServiceOptions = {}) {
     this.ports = ports;
     this.store = options.store ?? new InMemorySessionStore();
     this.generateId = options.generateId ?? defaultIdGenerator();
@@ -87,6 +89,61 @@ export class ScoreService {
     recordAction(session, `creada "${input.title}"`);
 
     return { scoreId: score.id, ...describeScore(score, session.history) };
+  }
+
+  // ------------------------------------------------------------ importacion
+
+  /**
+   * Lee un archivo y lo convierte en una sesion nueva.
+   *
+   * La interpretacion cruda se guarda en la sesion para poder volver a
+   * cuantizarla sin releer nada. Es la diferencia entre poder afinar el
+   * resultado y tener que empezar de cero en cada intento.
+   */
+  async importFile(path: string, options: ToScoreOptions = {}) {
+    const loader = this.ports.loader;
+    if (!loader) {
+      fail(
+        'FORMAT_UNAVAILABLE',
+        'Esta instalacion no tiene ningun cargador de interpretaciones montado.',
+        { path },
+      );
+    }
+
+    const performance = await loader.load(path);
+    const { score, summary } = importPerformance(this.generateId(), performance, options);
+    const session = this.store.create(score);
+    session.performance = performance;
+    recordAction(session, `importado "${path}": ${summary.notes} notas en ${summary.measures} compases`);
+
+    return { scoreId: score.id, source: path, ...summary };
+  }
+
+  /**
+   * Vuelve a convertir la misma interpretacion con otros parametros.
+   *
+   * Crea una sesion NUEVA en vez de sobrescribir la anterior, para poder
+   * comparar las dos versiones. Afinar una transcripcion es prueba y error, y
+   * perder el intento anterior en cada vuelta lo convierte en adivinanza.
+   */
+  requantize(scoreId: string, options: ToScoreOptions = {}) {
+    const origin = this.store.get(scoreId);
+    const { performance } = origin;
+    if (performance === undefined) {
+      fail(
+        'INVALID_REQUEST',
+        `La partitura "${scoreId}" no vino de una transcripcion, asi que no hay ` +
+          'interpretacion que volver a cuantizar.',
+        { scoreId },
+      );
+    }
+
+    const { score, summary } = importPerformance(this.generateId(), performance, options);
+    const session = this.store.create(score);
+    session.performance = performance;
+    recordAction(session, `recuantizado desde "${scoreId}"`);
+
+    return { scoreId: score.id, from: scoreId, ...summary };
   }
 
   addPart(scoreId: string, movementId: string | undefined, input: AddPartInput) {

@@ -1,6 +1,6 @@
 import type { Score } from '@sinfo/core';
 import { fail } from '../errors.js';
-import type { ExportFormat, RenderedArtifact, RenderPorts } from '../ports.js';
+import type { ExportFormat, RenderedArtifact, EnginePorts } from '../ports.js';
 
 /**
  * Exportacion a archivo.
@@ -44,7 +44,7 @@ export interface ExportResult {
 
 export async function exportScore(
   score: Score,
-  ports: RenderPorts,
+  ports: EnginePorts,
   input: ExportInput = {},
 ): Promise<ExportResult> {
   const format = input.format ?? 'midi';
@@ -61,7 +61,7 @@ export async function exportScore(
 
 async function renderArtifact(
   score: Score,
-  ports: RenderPorts,
+  ports: EnginePorts,
   format: ExportFormat,
   input: ExportInput,
 ): Promise<RenderedArtifact> {
@@ -109,7 +109,7 @@ async function renderArtifact(
  * SI hay se calcula de los puertos montados, no de una constante: una lista
  * escrita a mano se queda obsoleta en cuanto se enchufa un adaptador nuevo.
  */
-function unavailable(format: ExportFormat, adapter: string, ports: RenderPorts): never {
+function unavailable(format: ExportFormat, adapter: string, ports: EnginePorts): never {
   return fail(
     'FORMAT_UNAVAILABLE',
     `El formato "${format}" necesita el adaptador de ${adapter}, que no esta disponible en esta instalacion`,
@@ -118,6 +118,6 @@ function unavailable(format: ExportFormat, adapter: string, ports: RenderPorts):
 }
 
 /** Formatos que esta instalacion puede producir ahora mismo. */
-export function availableFormats(ports: RenderPorts): ExportFormat[] {
+export function availableFormats(ports: EnginePorts): ExportFormat[] {
   return ['midi', 'json', ...(ports.score?.formats ?? []), ...(ports.audio?.formats ?? [])];
 }

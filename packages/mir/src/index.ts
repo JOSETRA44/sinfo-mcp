@@ -12,3 +12,5 @@
 
 export type { ReadMidiOptions } from './midi/reader.js';
 export { readMidi } from './midi/reader.js';
+
+export { MidiFileLoader } from './loader.js';

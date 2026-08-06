@@ -19,6 +19,12 @@
       "path": "../theory"
     },
     {
+      "path": "../perform"
+    },
+    {
+      "path": "../transcribe"
+    },
+    {
       "path": "../generate"
     }
   ]
