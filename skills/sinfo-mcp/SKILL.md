@@ -1,6 +1,6 @@
 ---
 name: sinfo-mcp
-description: Compone música real con el servidor MCP sinfo — sinfonías, canciones, corales, beats — planeando la forma, escribiendo las voces, verificando armonía y conducción de voces, y exportando a MIDI, MusicXML, partitura SVG y audio WAV. Úsala SIEMPRE que aparezcan las herramientas `score_create`, `part_write`, `melody_generate`, `orchestrate` o `harmony_progression`, y también cuando el usuario pida componer, arreglar, armonizar, orquestar, escribir una melodía, hacer un beat, generar un MIDI o una partitura, aunque no mencione "sinfo" ni "MCP". Es imprescindible para no malgastar llamadas: el flujo correcto, la notación SinfoScript y el bucle de verificación no son evidentes desde los esquemas de las herramientas.
+description: Compone y transcribe música real con el servidor MCP sinfo — sinfonías, canciones, corales, beats — planeando la forma, escribiendo las voces, verificando armonía y conducción de voces, e importando archivos MIDI existentes como partitura editable. Exporta a MIDI, MusicXML, partitura SVG y audio WAV. Úsala SIEMPRE que aparezcan las herramientas `score_create`, `part_write`, `melody_generate`, `orchestrate`, `harmony_progression` o `import_midi`, y también cuando el usuario pida componer, arreglar, armonizar, orquestar, escribir una melodía, hacer un beat, generar un MIDI o una partitura, o convertir un MIDI en partitura, aunque no mencione "sinfo" ni "MCP". Es imprescindible para no malgastar llamadas: el flujo correcto, la notación SinfoScript y el bucle de verificación no son evidentes desde los esquemas de las herramientas.
 ---
 
 # Componer con sinfo-mcp
@@ -25,6 +25,25 @@ Componer de arriba abajo, como un compositor. Saltarse niveles produce música q
 ```
 
 **Los pasos 3 y 7 son los que más se olvidan y más valen.** Sin plan formal, a los cuarenta compases no sabes dónde estás. Sin verificación, entregas errores que no puedes ver leyendo tu propia salida.
+
+## Partir de un MIDI que ya existe
+
+`import_midi path:"..."` lee un archivo del disco y devuelve un `scoreId` **normal**. A partir de ahí todo lo demás funciona igual: analizarle la armonía, comprobar rangos, reorquestarlo para otro conjunto, exportarlo. Es la otra forma de empezar una obra.
+
+No es una conversión mecánica. El archivo trae tiempos medidos —y si se grabó tocando, el rubato del intérprete—, así que hay que **decidir** figuras, compás, alteraciones y voces. Esas decisiones vienen en la respuesta:
+
+| Campo | Para qué |
+|---|---|
+| `warnings` | Lo que se supuso por ti: compás inventado, anacrusa desplazada, tonalidad dudosa |
+| `keyMargin` | Margen sobre la segunda tonalidad candidata. **Por debajo de 0,15 no te fíes**: suele ser una mayor confundida con su relativa menor |
+| `meanDeviation` | Por pista. Por encima de 0,1 el problema casi siempre está en el pulso, no en las figuras |
+
+**Si algo no cuadra, no vuelvas a importar.** `transcribe_requantize` reaprovecha la lectura y prueba otros parámetros al instante, dejando viva la versión anterior para comparar:
+
+- Salen tresillos donde esperabas semicorcheas → `subdivisions: [1,2,4,8,16]`
+- La partitura está plagada de silencios diminutos → `gapPolicy: "legato"`
+- Las alteraciones están escritas al revés → impón `key`
+- Un 6/8 salió como 3/4 → impón `timeSignature` (miden lo mismo; los tiempos fuertes no los distinguen)
 
 ## SinfoScript: la notación
 

@@ -1,5 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { ScoreService, type ArtifactSink, type RenderPorts } from '@sinfo/engine';
+import { ScoreService, type ArtifactSink, type EnginePorts } from '@sinfo/engine';
+import { MidiFileLoader } from '@sinfo/mir';
 import { MidiFileRenderer, VerovioRenderer, WavRenderer } from '@sinfo/render';
 import { FileArtifactSink } from './adapters/file-sink.js';
 import { ok, toolError } from './result.js';
@@ -9,8 +10,8 @@ export const SERVER_NAME = 'sinfo-mcp';
 export const SERVER_VERSION = '0.1.0';
 
 export interface CreateServerOptions {
-  /** Adaptadores de salida. Si faltan, se montan los de serie. */
-  readonly ports?: Partial<RenderPorts>;
+  /** Adaptadores de entrada y salida. Si faltan, se montan los de serie. */
+  readonly ports?: Partial<EnginePorts>;
   readonly sink?: ArtifactSink;
   readonly service?: ScoreService;
 }
@@ -23,12 +24,13 @@ export interface CreateServerOptions {
  * eso los tests pueden montar el servidor entero con un sumidero en memoria
  * sin tocar el disco.
  */
-export function createPorts(options: CreateServerOptions = {}): RenderPorts {
+export function createPorts(options: CreateServerOptions = {}): EnginePorts {
   return {
     midi: options.ports?.midi ?? new MidiFileRenderer(),
     sink: options.sink ?? options.ports?.sink ?? new FileArtifactSink(),
     score: options.ports?.score ?? new VerovioRenderer(),
     audio: options.ports?.audio ?? new WavRenderer(),
+    loader: options.ports?.loader ?? new MidiFileLoader(),
   };
 }
 

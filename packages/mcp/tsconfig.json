@@ -19,7 +19,13 @@
       "path": "../engine"
     },
     {
+      "path": "../transcribe"
+    },
+    {
       "path": "../render"
+    },
+    {
+      "path": "../mir"
     }
   ]
 }
