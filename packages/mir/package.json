@@ -1,0 +1,28 @@
+{
+  "name": "@sinfo/mir",
+  "version": "0.1.0",
+  "description": "Adaptadores de ENTRADA: lectura de MIDI y, mas adelante, transcripcion de audio. Hermano de @sinfo/render, que es el de salida.",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "source": "./src/index.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc --build"
+  },
+  "dependencies": {
+    "@sinfo/core": "0.1.0",
+    "@sinfo/perform": "0.1.0",
+    "midi-file": "^1.2.4"
+  }
+}

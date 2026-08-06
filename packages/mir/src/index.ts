@@ -1,0 +1,14 @@
+/**
+ * @sinfo/mir — adaptadores de ENTRADA.
+ *
+ * Hermano de `@sinfo/render`: uno saca artefactos de la partitura, este mete
+ * material en ella. Ambos implementan puertos que declara `@sinfo/engine`, y
+ * ninguno de los dos conoce al otro.
+ *
+ * Hoy solo lee MIDI, que es la fuente donde no hay nada que estimar. La
+ * transcripcion de audio entra por aqui mismo mas adelante, produciendo el
+ * mismo `Performance` — que es justamente el motivo de que exista esa costura.
+ */
+
+export type { ReadMidiOptions } from './midi/reader.js';
+export { readMidi } from './midi/reader.js';
