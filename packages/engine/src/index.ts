@@ -105,6 +105,25 @@ export {
   type TransformationOp,
 } from './operations/generation.js';
 
+export {
+  addEnsemble,
+  listEnsembles,
+  listForms,
+  listSections,
+  planForm,
+  type EnsembleAddInput,
+  type EnsembleAddResult,
+  type PlanFormInput,
+  type PlanFormResult,
+  type SectionListResult,
+} from './operations/form.js';
+
+export {
+  orchestrate,
+  type OrchestrateInput,
+  type OrchestrateResult,
+} from './operations/orchestrate.js';
+
 export { exportScore, type ExportInput, type ExportResult } from './operations/exporting.js';
 
 export { ScoreService, type ScoreServiceOptions } from './score-service.js';

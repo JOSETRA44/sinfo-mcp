@@ -11,6 +11,16 @@ import {
 } from './operations/structure.js';
 import { exportScore, type ExportInput } from './operations/exporting.js';
 import {
+  addEnsemble,
+  listEnsembles,
+  listForms,
+  listSections,
+  planForm,
+  type EnsembleAddInput,
+  type PlanFormInput,
+} from './operations/form.js';
+import { orchestrate, type OrchestrateInput } from './operations/orchestrate.js';
+import {
   counterpointAdd,
   melodyGenerate,
   motifCreate,
@@ -115,6 +125,48 @@ export class ScoreService {
     const { session, movement } = this.resolve(scoreId, movementId);
     const result = setTimeline(movement, input);
     recordAction(session, `compas ${result.atMeasure}: ${result.applied.join(', ')}`);
+    return result;
+  }
+
+  // ------------------------------------------------------- forma y conjunto
+
+  planForm(scoreId: string, movementId: string | undefined, input: PlanFormInput) {
+    const { session, movement } = this.resolve(scoreId, movementId);
+    const result = planForm(movement, input);
+    recordAction(
+      session,
+      `forma ${result.form}: ${result.sections.length} secciones, ${result.totalMeasures} compases`,
+    );
+    return result;
+  }
+
+  sections(scoreId: string, movementId?: string) {
+    const { movement } = this.resolve(scoreId, movementId);
+    return listSections(movement);
+  }
+
+  addEnsemble(scoreId: string, movementId: string | undefined, input: EnsembleAddInput) {
+    const { session, movement } = this.resolve(scoreId, movementId);
+    const result = addEnsemble(movement, input);
+    recordAction(session, `conjunto ${result.ensemble}: ${result.parts.length} partes`);
+    return result;
+  }
+
+  ensembles() {
+    return { ensembles: listEnsembles() };
+  }
+
+  forms() {
+    return { forms: listForms() };
+  }
+
+  orchestrate(scoreId: string, movementId: string | undefined, input: OrchestrateInput) {
+    const { session, movement } = this.resolve(scoreId, movementId);
+    const result = orchestrate(movement, input);
+    recordAction(
+      session,
+      `orquestado "${input.sourcePartId}" en ${result.assignments.length} partes (${result.style})`,
+    );
     return result;
   }
 

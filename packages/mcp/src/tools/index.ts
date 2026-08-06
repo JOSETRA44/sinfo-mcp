@@ -1,5 +1,13 @@
 import { exportScore } from './export.js';
 import {
+  ensembleAdd,
+  ensembleList,
+  formList,
+  orchestrate,
+  planForm,
+  sectionList,
+} from './form.js';
+import {
   counterpointAdd,
   melodyGenerate,
   motifCreate,
@@ -41,9 +49,15 @@ export const ALL_TOOLS: readonly AnyToolDefinition[] = [
   // 1. abrir y estructurar
   scoreCreate,
   instrumentsList,
+  ensembleList,
+  ensembleAdd,
   partAdd,
   movementAdd,
   timelineSet,
+
+  // 1b. planificar la forma
+  formList,
+  planForm,
 
   // 2. material tematico
   motifCreate,
@@ -51,6 +65,7 @@ export const ALL_TOOLS: readonly AnyToolDefinition[] = [
   motifWrite,
   melodyGenerate,
   counterpointAdd,
+  orchestrate,
 
   // 3. componer
   harmonyProgression,
@@ -61,6 +76,7 @@ export const ALL_TOOLS: readonly AnyToolDefinition[] = [
   scoreDescribe,
   partRead,
   motifList,
+  sectionList,
   timelineDescribe,
   analyzeHarmony,
   checkVoiceLeading,

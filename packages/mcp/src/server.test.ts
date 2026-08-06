@@ -41,7 +41,15 @@ async function call<T = Record<string, unknown>>(
   return parsed;
 }
 
-/** Igual que `call`, pero espera que falle y devuelve el error estructurado. */
+/**
+ * Igual que `call`, pero espera que falle y devuelve el error estructurado.
+ *
+ * Hay dos clases de fallo y conviene distinguirlas. Los de VALIDACION los
+ * rechaza el esquema antes de llegar al handler, y vuelven como texto plano
+ * del protocolo; el modelo no los necesita explicados porque las opciones
+ * validas ya estan en el esquema de la herramienta. Los de LOGICA los produce
+ * el motor y vuelven como JSON con codigo y detalles.
+ */
 async function callExpectingError(
   name: string,
   args: Record<string, unknown> = {},
@@ -51,7 +59,13 @@ async function callExpectingError(
     isError?: boolean;
   };
   expect(result.isError).toBe(true);
-  return JSON.parse(result.content[0]!.text);
+
+  const text = result.content[0]!.text;
+  try {
+    return JSON.parse(text) as { code: string; message: string };
+  } catch {
+    return { code: 'SCHEMA_VALIDATION', message: text };
+  }
 }
 
 describe('registro de herramientas', () => {
@@ -427,6 +441,263 @@ describe('obras de varios movimientos', () => {
     const midi = parseMidi(sink.saved.at(-1)!.artifact.data);
     const notes = midi.tracks[1]!.filter((e) => e.type === 'noteOn');
     expect(notes).toHaveLength(1);
+  });
+});
+
+describe('forma y conjunto', () => {
+  it('monta una orquesta sinfonica de una sola llamada', async () => {
+    const { scoreId } = await call<{ scoreId: string }>('score_create', { title: 'Sinfonia' });
+
+    const result = await call<{ ensemble: string; parts: { partId: string }[] }>(
+      'ensemble_add',
+      { scoreId, ensemble: 'symphony_orchestra' },
+    );
+
+    expect(result.parts.length).toBeGreaterThanOrEqual(28);
+    // Los repetidos se numeran solos: dos flautas, cuatro trompas.
+    const ids = result.parts.map((p) => p.partId);
+    expect(ids).toContain('flute');
+    expect(ids).toContain('flute2');
+    expect(ids).toContain('horn4');
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('reparte una forma sonata con su plan tonal', async () => {
+    const { scoreId } = await call<{ scoreId: string }>('score_create', {
+      title: 'Primer movimiento',
+      key: 'C major',
+    });
+
+    const plan = await call<{
+      form: string;
+      totalMeasures: number;
+      sections: { name: string; role: string; from: number; to: number; key: string }[];
+    }>('plan_form', { scoreId, form: 'sonata', totalMeasures: 120 });
+
+    expect(plan.totalMeasures).toBe(120);
+    expect(plan.sections.map((s) => s.role)).toEqual([
+      'exposicion', 'transicion', 'exposicion',
+      'desarrollo', 'reexposicion', 'reexposicion', 'coda',
+    ]);
+
+    // El segundo tema va a la dominante y vuelve a la tonica al reexponerse.
+    expect(plan.sections[2]!.key).toBe('G major');
+    expect(plan.sections[5]!.key).toBe('C major');
+  });
+
+  it('en modo menor el segundo tema va al relativo mayor', async () => {
+    const { scoreId } = await call<{ scoreId: string }>('score_create', {
+      title: 'En la menor',
+      key: 'A minor',
+    });
+    const plan = await call<{ sections: { key: string }[] }>('plan_form', {
+      scoreId,
+      form: 'sonata',
+      totalMeasures: 100,
+    });
+    expect(plan.sections[2]!.key).toBe('C major');
+  });
+
+  it('las secciones se encadenan sin huecos ni solapamientos', async () => {
+    const { scoreId } = await call<{ scoreId: string }>('score_create', { title: 'Rondo' });
+    const plan = await call<{ sections: { from: number; to: number }[] }>('plan_form', {
+      scoreId,
+      form: 'rondo',
+      totalMeasures: 96,
+    });
+
+    expect(plan.sections[0]!.from).toBe(1);
+    for (let i = 1; i < plan.sections.length; i++) {
+      expect(plan.sections[i]!.from).toBe(plan.sections[i - 1]!.to + 1);
+    }
+  });
+
+  it('acepta una forma a medida', async () => {
+    const { scoreId } = await call<{ scoreId: string }>('score_create', { title: 'A medida' });
+    const plan = await call<{ sections: { name: string; measures: number }[] }>('plan_form', {
+      scoreId,
+      sections: [
+        { name: 'Intro', role: 'introduccion', measures: 4 },
+        { name: 'Tema', role: 'tema', measures: 16, key: 'F major' },
+        { name: 'Final', role: 'coda', measures: 8 },
+      ],
+    });
+
+    expect(plan.sections.map((s) => s.measures)).toEqual([4, 16, 8]);
+    expect(plan.totalMeasures).toBe(28);
+  });
+
+  it('section_list dice cuanto queda por componer', async () => {
+    const { scoreId } = await call<{ scoreId: string }>('score_create', {
+      title: 'Progreso',
+      instruments: ['piano'],
+    });
+    await call('plan_form', { scoreId, form: 'binary', totalMeasures: 16 });
+    await call('part_write', { scoreId, partId: 'piano', notation: 'c4/w | d4/w' });
+
+    const listed = await call<{ totalMeasures: number; writtenMeasures: number }>(
+      'section_list',
+      { scoreId },
+    );
+    expect(listed.totalMeasures).toBe(16);
+    expect(listed.writtenMeasures).toBe(2);
+  });
+
+  // Las formas validas son un enum del esquema: el modelo las ve al listar la
+  // herramienta y una invalida se rechaza antes de llegar al motor.
+  it('una forma inventada se rechaza en la validacion', async () => {
+    const { scoreId } = await call<{ scoreId: string }>('score_create', { title: 'X' });
+    const error = await callExpectingError('plan_form', { scoreId, form: 'fuga_infinita' });
+    expect(error.code).toBe('SCHEMA_VALIDATION');
+  });
+
+  it('el esquema publica las formas validas', async () => {
+    const { tools } = await client.listTools();
+    const schema = JSON.stringify(tools.find((t) => t.name === 'plan_form')!.inputSchema);
+    expect(schema).toContain('sonata');
+    expect(schema).toContain('theme_and_variations');
+  });
+});
+
+describe('orquestacion', () => {
+  async function orchestralScore(): Promise<string> {
+    const { scoreId } = await call<{ scoreId: string }>('score_create', {
+      title: 'Orquestada',
+      key: 'C major',
+      instruments: ['flute', 'oboe', 'clarinet', 'horn', 'trumpet', 'trombone', 'violin', 'viola', 'cello', 'contrabass'],
+    });
+    await call('part_write', {
+      scoreId,
+      partId: 'violin',
+      notation: 'c5/q d5/q e5/q f5/q | g5/h e5/h',
+    });
+    return scoreId;
+  }
+
+  it('reparte papeles entre todas las partes', async () => {
+    const scoreId = await orchestralScore();
+
+    const result = await call<{
+      style: string;
+      assignments: { partId: string; role: string; instrument: string }[];
+      balance: { issues: string[] };
+    }>('orchestrate', {
+      scoreId,
+      sourcePartId: 'violin',
+      progression: ['I', 'V'],
+      seed: 'orq-1',
+    });
+
+    expect(result.assignments.length).toBe(9);
+    const roles = new Set(result.assignments.map((a) => a.role));
+    expect(roles).toContain('melodia');
+    expect(roles).toContain('bajo');
+  });
+
+  it('los graves llevan el bajo y los agudos la melodia', async () => {
+    const scoreId = await orchestralScore();
+    const result = await call<{ assignments: { instrument: string; role: string }[] }>(
+      'orchestrate',
+      { scoreId, sourcePartId: 'violin', progression: ['I', 'V'], seed: 'orq-2' },
+    );
+
+    const byInstrument = new Map(result.assignments.map((a) => [a.instrument, a.role]));
+    expect(byInstrument.get('contrabass')).toBe('bajo');
+    expect(byInstrument.get('flute')).toBe('melodia');
+  });
+
+  /**
+   * La comprobacion que cierra el circulo: lo orquestado no puede contener una
+   * sola nota fuera del rango de su instrumento, con la transposicion aplicada.
+   */
+  it('nada queda fuera del rango de su instrumento', async () => {
+    const scoreId = await orchestralScore();
+    await call('orchestrate', {
+      scoreId,
+      sourcePartId: 'violin',
+      progression: ['I', 'V'],
+      seed: 'orq-rangos',
+    });
+
+    const check = await call<{ issueCount: number; issues: unknown[] }>('check_ranges', {
+      scoreId,
+    });
+    expect(check.issues.filter((i) => (i as { verdict: string }).verdict.includes('range')))
+      .toEqual([]);
+    expect(check.issueCount).toBe(0);
+  });
+
+  it('el tutti dobla mas la melodia que el estilo de camara', async () => {
+    const count = async (style: string): Promise<number> => {
+      const scoreId = await orchestralScore();
+      const result = await call<{ assignments: { role: string }[] }>('orchestrate', {
+        scoreId,
+        sourcePartId: 'violin',
+        style,
+        seed: 'comparar',
+      });
+      return result.assignments.filter((a) => a.role === 'melodia').length;
+    };
+
+    expect(await count('tutti')).toBeGreaterThan(await count('camara'));
+  });
+
+  it('avisa cuando el acompanamiento tapa a la melodia', async () => {
+    const { scoreId } = await call<{ scoreId: string }>('score_create', {
+      title: 'Desequilibrada',
+      instruments: ['flute', 'trombone', 'trombone', 'tuba'],
+    });
+    await call('part_write', { scoreId, partId: 'flute', notation: 'c6/w | d6/w' });
+
+    const result = await call<{ balance: { issues: string[]; weights: Record<string, number> } }>(
+      'orchestrate',
+      { scoreId, sourcePartId: 'flute', progression: ['I', 'V'], seed: 'balance' },
+    );
+
+    expect(result.balance.weights['armonia'] ?? 0).toBeGreaterThan(0);
+  });
+
+  it('es reproducible con la misma semilla', async () => {
+    const run = async (): Promise<string[]> => {
+      const scoreId = await orchestralScore();
+      const result = await call<{ assignments: { partId: string; role: string }[] }>(
+        'orchestrate',
+        { scoreId, sourcePartId: 'violin', style: 'camara', seed: 'identica' },
+      );
+      return result.assignments.map((a) => `${a.partId}:${a.role}`);
+    };
+    expect(await run()).toEqual(await run());
+  });
+
+  it('rechaza orquestar una parte vacia', async () => {
+    const { scoreId } = await call<{ scoreId: string }>('score_create', {
+      title: 'Vacia',
+      instruments: ['violin', 'cello'],
+    });
+    const error = await callExpectingError('orchestrate', { scoreId, sourcePartId: 'violin' });
+    expect(error.code).toBe('INVALID_REQUEST');
+  });
+
+  it('un estilo inventado se rechaza en la validacion', async () => {
+    const scoreId = await orchestralScore();
+    const error = await callExpectingError('orchestrate', {
+      scoreId,
+      sourcePartId: 'violin',
+      style: 'sinfonico-cuantico',
+    });
+    expect(error.code).toBe('SCHEMA_VALIDATION');
+  });
+
+  it('un conjunto inventado si dice cuales hay', async () => {
+    // `ensemble` es texto libre, no enum: la lista crece con el catalogo y
+    // fijarla en el esquema obligaria a mantenerla en dos sitios.
+    const { scoreId } = await call<{ scoreId: string }>('score_create', { title: 'X' });
+    const error = await callExpectingError('ensemble_add', {
+      scoreId,
+      ensemble: 'orquesta_marciana',
+    });
+    expect(error.code).toBe('INVALID_REQUEST');
+    expect(error.details?.['available']).toContain('symphony_orchestra');
   });
 });
 
