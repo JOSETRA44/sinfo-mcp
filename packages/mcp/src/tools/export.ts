@@ -26,6 +26,28 @@ export const exportScore = defineTool({
     movementId: movementIdSchema.describe(
       'Exportar un solo movimiento. Si se omite, todos concatenados.',
     ),
+    groove: z
+      .enum(['straight', 'swing', 'shuffle', 'laid_back', 'driving', 'funk', 'waltz'])
+      .optional()
+      .describe(
+        'Groove al interpretar. Afecta solo a midi y wav: NO cambia la partitura, porque un ' +
+          'pasaje con swing se escribe con corcheas rectas. Usa groove_list para ver que hace ' +
+          'cada uno.',
+      ),
+    humanize: z
+      .number()
+      .min(0)
+      .max(1)
+      .optional()
+      .describe(
+        'Cuanto se desordena el resultado, de 0 a 1. Descuadra el tiempo y varia la ' +
+          'intensidad para que no suene a maquina. 0.2 a 0.4 es lo natural; por encima de 0.7 ' +
+          'suena a interprete inseguro.',
+      ),
+    performanceSeed: z
+      .string()
+      .optional()
+      .describe('Semilla de la humanizacion: la misma da exactamente la misma interpretacion.'),
     ppq: z
       .int()
       .min(96)

@@ -14,6 +14,7 @@ import type {
   ExportFormat,
   RenderedArtifact,
 } from '@sinfo/engine';
+import { getGroove, humanize, type PerformedNote } from '@sinfo/generate';
 import { readFile } from 'node:fs/promises';
 import { assignChannels } from '../midi/channels.js';
 
@@ -46,7 +47,7 @@ export class WavRenderer implements AudioRenderer {
       ? [score.movement(options.movementId)]
       : [...score.movements];
 
-    const events = scheduleEvents(score, movements);
+    const events = scheduleEvents(score, movements, options);
     const seconds = events.reduce((end, event) => Math.max(end, event.at), 0) + 1.5;
     const totalSamples = Math.ceil(sampleRate * seconds);
 
@@ -145,7 +146,11 @@ interface TimedEvent {
  * un adagio y en un presto no caen en el mismo sitio, y calcularlo con un
  * tempo unico desplazaria todo lo que viene despues del primer cambio.
  */
-function scheduleEvents(score: Score, movements: readonly Movement[]): TimedEvent[] {
+function scheduleEvents(
+  score: Score,
+  movements: readonly Movement[],
+  options: AudioRenderOptions,
+): TimedEvent[] {
   const parts = movements.flatMap((movement) => movement.parts);
   const channels = assignChannels(parts);
   const events: TimedEvent[] = [];
@@ -161,23 +166,50 @@ function scheduleEvents(score: Score, movements: readonly Movement[]): TimedEven
         seen.add(channel);
       }
 
+      const measure = movement.timeline.timeSignatureAt(Duration.ZERO).measureDuration;
+
       for (const voice of part.voices) {
         let dynamic: Dynamic | undefined;
 
+        // Se recogen primero y se interpretan despues, igual que en el MIDI:
+        // el groove necesita ver cada nota en su sitio dentro del compas.
+        const raw: PerformedNote[] = [];
         for (const { position, event } of voice.positioned()) {
           if (event.dynamic !== undefined) dynamic = event.dynamic;
           if (isRest(event)) continue;
+          raw.push({
+            position,
+            duration: event.duration,
+            velocity: resolveVelocity(event, {
+              instrumentOffset: part.instrument.velocityOffset,
+              ...(dynamic !== undefined ? { prevailingDynamic: dynamic } : {}),
+            }),
+            event,
+          });
+        }
 
+        const groove = options.groove ? getGroove(options.groove) : undefined;
+        const played =
+          groove || options.humanize
+            ? humanize(raw, {
+                ...(groove ? { groove } : {}),
+                ...(options.humanize !== undefined ? { amount: options.humanize } : {}),
+                // La semilla lleva la parte: si todas compartieran flujo, todos
+                // los instrumentos se descuadrarian igual y sonaria a grabacion
+                // desplazada, no a musicos tocando juntos.
+                seed: `${options.performanceSeed ?? 'groove'}::${part.id}`,
+                measureDuration: measure,
+              })
+            : raw;
+
+        for (const note of played) {
+          const { event, position } = note;
           const start = elapsed + secondsAt(movement, position);
-          const written = secondsAt(movement, position.plus(event.duration)) -
+          const written = secondsAt(movement, position.plus(note.duration)) -
             secondsAt(movement, position);
           const factor = Math.min(1, articulationLengthFactor(event.articulations ?? []));
           const sounding = Math.max(0.02, written * factor);
-
-          const velocity = resolveVelocity(event, {
-            instrumentOffset: part.instrument.velocityOffset,
-            ...(dynamic !== undefined ? { prevailingDynamic: dynamic } : {}),
-          });
+          const velocity = note.velocity;
 
           for (const pitch of event.pitches) {
             const midi = part.instrument.isPercussion

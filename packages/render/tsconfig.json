@@ -16,6 +16,12 @@
       "path": "../core"
     },
     {
+      "path": "../theory"
+    },
+    {
+      "path": "../generate"
+    },
+    {
       "path": "../engine"
     }
   ]

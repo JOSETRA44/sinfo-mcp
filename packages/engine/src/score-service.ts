@@ -20,6 +20,7 @@ import {
   type PlanFormInput,
 } from './operations/form.js';
 import { orchestrate, type OrchestrateInput } from './operations/orchestrate.js';
+import { listGrooves } from '@sinfo/generate';
 import {
   counterpointAdd,
   melodyGenerate,
@@ -158,6 +159,10 @@ export class ScoreService {
 
   forms() {
     return { forms: listForms() };
+  }
+
+  grooves() {
+    return { grooves: listGrooves() };
   }
 
   orchestrate(scoreId: string, movementId: string | undefined, input: OrchestrateInput) {

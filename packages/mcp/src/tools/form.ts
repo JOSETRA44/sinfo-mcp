@@ -165,3 +165,16 @@ export const orchestrate = defineTool({
   },
   handler: (args, { service }) => service.orchestrate(args.scoreId, args.movementId, args),
 });
+
+export const grooveList = defineTool({
+  name: 'groove_list',
+  title: 'Listar grooves disponibles',
+  description:
+    'Devuelve los grooves que entiende `export`, con lo que hace cada uno. El groove es ' +
+    'INTERPRETACION, no notacion: cambia como suena el MIDI y el audio, no lo que aparece en ' +
+    'la partitura. Un pasaje con swing se escribe con corcheas rectas y se interpreta ' +
+    'balanceado; escribirlo en tresillos seria notacion incorrecta.',
+  inputSchema: {},
+  hints: { readOnlyHint: true, idempotentHint: true },
+  handler: (_args, { service }) => service.grooves(),
+});

@@ -24,7 +24,8 @@
     "@sinfo/engine": "0.1.0",
     "midi-file": "^1.2.4",
     "spessasynth_core": "^4.3.16",
-    "verovio": "^6.2.0"
+    "verovio": "^6.2.0",
+    "@sinfo/generate": "0.1.0"
   },
   "source": "./src/index.ts"
 }

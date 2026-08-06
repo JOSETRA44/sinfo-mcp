@@ -16,6 +16,23 @@ export interface ExportInput {
   readonly movementId?: string | undefined;
   /** Solo para MIDI: pulsos por negra. */
   readonly ppq?: number | undefined;
+  /** Groove a aplicar al interpretar. Solo afecta a MIDI y audio. */
+  readonly groove?: string | undefined;
+  readonly humanize?: number | undefined;
+  readonly performanceSeed?: string | undefined;
+}
+
+/** Opciones de interpretacion, compartidas por MIDI y audio. */
+function performanceOf(input: ExportInput): {
+  groove?: string;
+  humanize?: number;
+  performanceSeed?: string;
+} {
+  return {
+    ...(input.groove !== undefined ? { groove: input.groove } : {}),
+    ...(input.humanize !== undefined ? { humanize: input.humanize } : {}),
+    ...(input.performanceSeed !== undefined ? { performanceSeed: input.performanceSeed } : {}),
+  };
 }
 
 export interface ExportResult {
@@ -54,6 +71,7 @@ async function renderArtifact(
     case 'midi':
       return ports.midi.render(score, {
         ...movementOption,
+        ...performanceOf(input),
         ...(input.ppq !== undefined ? { ppq: input.ppq } : {}),
       });
 
@@ -71,7 +89,7 @@ async function renderArtifact(
       if (!ports.audio?.formats.includes(format)) {
         return unavailable(format, 'audio', ports);
       }
-      return ports.audio.render(score, { ...movementOption, format });
+      return ports.audio.render(score, { ...movementOption, ...performanceOf(input), format });
 
     case 'json':
       return {

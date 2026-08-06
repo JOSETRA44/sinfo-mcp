@@ -3,6 +3,7 @@ import {
   ensembleAdd,
   ensembleList,
   formList,
+  grooveList,
   orchestrate,
   planForm,
   sectionList,
@@ -57,6 +58,7 @@ export const ALL_TOOLS: readonly AnyToolDefinition[] = [
 
   // 1b. planificar la forma
   formList,
+  grooveList,
   planForm,
 
   // 2. material tematico

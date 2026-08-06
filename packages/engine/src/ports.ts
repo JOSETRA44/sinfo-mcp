@@ -29,7 +29,22 @@ export interface RenderedArtifact {
   readonly meta?: Readonly<Record<string, unknown>>;
 }
 
-export interface MidiRenderOptions {
+/**
+ * Interpretacion: groove y humanizacion.
+ *
+ * Van en las opciones de RENDER y no en la partitura porque son decisiones de
+ * interpretacion, no de notacion: un pasaje con swing se escribe con corcheas
+ * rectas. Las comparten el MIDI y el audio.
+ */
+export interface PerformanceOptions {
+  /** Id de groove: straight, swing, shuffle, laid_back, driving, funk, waltz. */
+  readonly groove?: string | undefined;
+  /** Cuanto se desordena el resultado, de 0 a 1. */
+  readonly humanize?: number | undefined;
+  readonly performanceSeed?: string | undefined;
+}
+
+export interface MidiRenderOptions extends PerformanceOptions {
   /** Pulsos por negra. 480 cubre tresillos y quintillos de forma exacta. */
   readonly ppq?: number;
   /** Movimiento concreto; por defecto, todos concatenados. */
@@ -59,7 +74,7 @@ export interface ScoreRenderer {
   render(score: Score, options?: ScoreRenderOptions): Promise<RenderedArtifact>;
 }
 
-export interface AudioRenderOptions {
+export interface AudioRenderOptions extends PerformanceOptions {
   readonly movementId?: string;
   readonly format?: 'wav' | 'mp3';
   readonly sampleRate?: number;

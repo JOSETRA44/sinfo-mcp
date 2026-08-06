@@ -10,6 +10,7 @@ import {
   type Score,
 } from '@sinfo/core';
 import type { MidiRenderer, MidiRenderOptions, RenderedArtifact } from '@sinfo/engine';
+import { getGroove, humanize, type PerformedNote } from '@sinfo/generate';
 import { writeMidi, type MidiEvent } from 'midi-file';
 import { assignChannels } from './channels.js';
 
@@ -56,9 +57,16 @@ export class MidiFileRenderer implements MidiRenderer {
     let offset = Duration.ZERO;
     for (const movement of movements) {
       collectConductorEvents(movement, offset, ppq, conductor);
+      const measure = movement.timeline.timeSignatureAt(Duration.ZERO).measureDuration;
       for (const part of movement.parts) {
         const channel = channels.byPartId.get(part.id)!;
-        collectNotes(part, offset, ppq, channel, notesByPart.get(part.id)!);
+        collectNotes(part, offset, ppq, channel, notesByPart.get(part.id)!, {
+          ...(options.groove !== undefined ? { groove: options.groove } : {}),
+          ...(options.humanize !== undefined ? { humanize: options.humanize } : {}),
+          ...(options.performanceSeed !== undefined ? { seed: options.performanceSeed } : {}),
+          measure,
+          partId: part.id,
+        });
       }
       offset = offset.plus(movement.duration);
     }
@@ -176,12 +184,21 @@ function collectConductorEvents(
   }
 }
 
+interface PerformanceContext {
+  readonly groove?: string;
+  readonly humanize?: number;
+  readonly seed?: string;
+  readonly measure: Duration;
+  readonly partId: string;
+}
+
 function collectNotes(
   part: Part,
   offset: Duration,
   ppq: number,
   channel: number,
   out: ScheduledNote[],
+  performance: PerformanceContext,
 ): void {
   for (const voice of part.voices) {
     // La dinamica es una MARCA que rige hasta la siguiente, no una propiedad
@@ -190,28 +207,40 @@ function collectNotes(
     // nota y el resto volveria a mezzoforte.
     let prevailingDynamic: Dynamic | undefined;
 
+    // Se recogen primero y se interpretan despues: el groove necesita ver
+    // cada nota en su sitio dentro del compas para saber si le toca acento.
+    const raw: PerformedNote[] = [];
     for (const { position, event } of voice.positioned()) {
       if (event.dynamic !== undefined) prevailingDynamic = event.dynamic;
       if (isRest(event)) continue;
+
+      raw.push({
+        position,
+        duration: event.duration,
+        velocity: resolveVelocity(event, {
+          instrumentOffset: part.instrument.velocityOffset,
+          ...(prevailingDynamic !== undefined ? { prevailingDynamic } : {}),
+        }),
+        event,
+      });
+    }
+
+    for (const note of applyPerformance(raw, performance)) {
+      const { event } = note;
 
       // Se redondea la POSICION ABSOLUTA, no cada duracion por separado. Si
       // se redondease duracion a duracion, el error se sumaria nota a nota y
       // al compas 500 la musica iria corrida. Asi el error nunca se acumula:
       // cada nota se ancla a su posicion exacta.
-      const absoluteStart = offset.plus(position);
+      const absoluteStart = offset.plus(note.position);
       const startTick = absoluteStart.toTicks(ppq);
-      const endOfWritten = absoluteStart.plus(event.duration).toTicks(ppq);
+      const endOfWritten = absoluteStart.plus(note.duration).toTicks(ppq);
 
       // El staccato acorta lo que SUENA; lo escrito no cambia. El factor se
       // limita a 1: una nota nunca invade el sitio de la siguiente, ni
       // siquiera con calderon, que alarga el compas y no la nota.
       const factor = Math.min(1, articulationLengthFactor(event.articulations ?? []));
       const soundingTicks = Math.max(1, Math.round((endOfWritten - startTick) * factor));
-
-      const velocity = resolveVelocity(event, {
-        instrumentOffset: part.instrument.velocityOffset,
-        ...(prevailingDynamic !== undefined ? { prevailingDynamic } : {}),
-      });
 
       for (const written of event.pitches) {
         // La percusion no transpone: sus "alturas" son numeros de sonido.
@@ -222,12 +251,31 @@ function collectNotes(
           startTick,
           endTick: startTick + soundingTicks,
           noteNumber: clampMidi(sounding.midi),
-          velocity,
+          velocity: note.velocity,
           channel,
         });
       }
     }
   }
+}
+
+/** Aplica groove y humanizacion si se pidieron; si no, deja las notas intactas. */
+function applyPerformance(
+  notes: readonly PerformedNote[],
+  performance: PerformanceContext,
+): PerformedNote[] {
+  const groove = performance.groove ? getGroove(performance.groove) : undefined;
+  if (!groove && !performance.humanize) return [...notes];
+
+  return humanize(notes, {
+    ...(groove ? { groove } : {}),
+    ...(performance.humanize !== undefined ? { amount: performance.humanize } : {}),
+    // La semilla incluye la parte: si todas compartieran flujo, todos los
+    // instrumentos se descuadrarian igual y no sonaria humano, sonaria a
+    // grabacion desplazada.
+    seed: `${performance.seed ?? 'groove'}::${performance.partId}`,
+    measureDuration: performance.measure,
+  });
 }
 
 function buildConductorTrack(title: string, events: readonly TimedMidiEvent[]): MidiEvent[] {
