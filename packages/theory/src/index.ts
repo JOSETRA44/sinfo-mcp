@@ -40,10 +40,12 @@ export {
 } from './verticality.js';
 
 export {
+  analyzeVoiceLeading,
   checkVoiceLeading,
   summarizeIssues,
   type Severity,
   type VoiceLeadingIssue,
   type VoiceLeadingOptions,
   type VoiceLeadingRule,
+  type VoiceLeadingSummary,
 } from './voice-leading.js';

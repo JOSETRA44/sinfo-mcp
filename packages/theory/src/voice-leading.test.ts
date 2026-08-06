@@ -1,6 +1,11 @@
 import { parseVoice, Voice } from '@sinfo/core';
 import { describe, expect, it } from 'vitest';
-import { checkVoiceLeading, summarizeIssues, type VoiceLeadingRule } from './voice-leading.js';
+import {
+  analyzeVoiceLeading,
+  checkVoiceLeading,
+  summarizeIssues,
+  type VoiceLeadingRule,
+} from './voice-leading.js';
 import type { LabeledVoice } from './verticality.js';
 
 /** Construye un coral a cuatro voces desde SinfoScript, de grave a agudo. */
@@ -173,6 +178,66 @@ describe('corales completos', () => {
     // Sin silencio de por medio serian quintas paralelas; con el, no hay
     // movimiento continuo que analizar entre esos dos acordes.
     expect(issues.filter((i) => i.severity === 'error')).toEqual([]);
+  });
+});
+
+/**
+ * Sin esto el analisis es inutil a escala orquestal: en un tutti, once
+ * instrumentos llevan la misma melodia en octavas y todos los pares son
+ * octavas paralelas tecnicamente, pero musicalmente son doblajes.
+ */
+describe('doblajes en octava', () => {
+  it('la misma linea en dos octavas no son octavas paralelas', () => {
+    const issues = checkVoiceLeading(duo('c4/q d4/q e4/q f4/q', 'c5/q d5/q e5/q f5/q'));
+    expect(rulesFound(issues)).not.toContain('octavas-paralelas');
+  });
+
+  it('se identifica el par doblado', () => {
+    const summary = analyzeVoiceLeading(duo('c4/q d4/q e4/q', 'c5/q d5/q e5/q'));
+    expect(summary.doublings).toEqual([['inferior', 'superior']]);
+  });
+
+  it('un doblaje al unisono tambien cuenta', () => {
+    const issues = checkVoiceLeading(duo('c4/q d4/q e4/q', 'c4/q d4/q e4/q'));
+    expect(rulesFound(issues)).not.toContain('octavas-paralelas');
+  });
+
+  // El criterio es estricto a proposito: basta separarse una vez para volver a
+  // ser voces independientes en todo el pasaje.
+  it('si se separan una sola vez vuelven a ser voces independientes', () => {
+    const issues = checkVoiceLeading(duo('c4/q d4/q e4/q f4/q', 'c5/q d5/q g5/q f5/q'));
+    expect(rulesFound(issues)).toContain('octavas-paralelas');
+  });
+
+  it('dos notas coincidentes no bastan para llamarlo doblaje', () => {
+    const summary = analyzeVoiceLeading(duo('c4/q d4/q', 'c5/q d5/q'));
+    expect(summary.doublings).toEqual([]);
+  });
+
+  it('no oculta las quintas paralelas, que no son doblaje', () => {
+    const issues = checkVoiceLeading(duo('c3/q d3/q e3/q', 'g3/q a3/q b3/q'));
+    expect(rulesFound(issues)).toContain('quintas-paralelas');
+  });
+
+  it('el doblaje tampoco cuenta como espaciado excesivo', () => {
+    const issues = checkVoiceLeading(
+      choir('c2/q d2/q e2/q', 'c3/q d3/q e3/q', 'c4/q d4/q e4/q', 'c5/q d5/q e5/q'),
+    );
+    expect(rulesFound(issues)).not.toContain('espaciado-excesivo');
+  });
+
+  it('se puede desactivar para ver el analisis en crudo', () => {
+    const issues = checkVoiceLeading(duo('c4/q d4/q e4/q', 'c5/q d5/q e5/q'), {
+      ignoreDoublings: false,
+    });
+    expect(rulesFound(issues)).toContain('octavas-paralelas');
+  });
+
+  it('un coral a cuatro voces reales no tiene doblajes', () => {
+    const summary = analyzeVoiceLeading(
+      choir('g2/q c3/q', 'd3/q e3/q', 'b3/q c4/q', 'g4/q g4/q'),
+    );
+    expect(summary.doublings).toEqual([]);
   });
 });
 

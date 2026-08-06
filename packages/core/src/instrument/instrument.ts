@@ -1,17 +1,13 @@
 import { Interval } from '../pitch/interval.js';
+import {
+  INSTRUMENT_SPECS,
+  type Clef,
+  type InstrumentFamily,
+  type InstrumentSpec,
+} from './catalog.js';
 import { Pitch } from '../pitch/pitch.js';
 
-export type InstrumentFamily =
-  | 'woodwind'
-  | 'brass'
-  | 'percussion'
-  | 'keyboard'
-  | 'strings'
-  | 'voice'
-  | 'plucked'
-  | 'electronic';
-
-export type Clef = 'treble' | 'bass' | 'alto' | 'tenor' | 'percussion';
+export type { Clef, InstrumentFamily };
 
 /**
  * Instrumento: lo que hace posible orquestar sin escribir notas imposibles.
@@ -41,18 +37,13 @@ export interface Instrument {
   readonly isPercussion: boolean;
   /** Ajuste de velocity para compensar el volumen natural del instrumento. */
   readonly velocityOffset: number;
-}
-
-interface InstrumentSpec {
-  readonly name: string;
-  readonly family: InstrumentFamily;
-  readonly midiProgram: number;
-  readonly range: readonly [string, string];
-  readonly tessitura: readonly [string, string];
-  readonly transposition?: string;
-  readonly clef?: Clef;
-  readonly isPercussion?: boolean;
-  readonly velocityOffset?: number;
+  /**
+   * Ejecutantes de la seccion en una orquesta sinfonica. Es lo que decide el
+   * balance: catorce violines tapan a una flauta aunque los dos toquen mf.
+   */
+  readonly sectionSize: number;
+  /** Peso dinamico relativo, 1 = referencia (un violin). */
+  readonly weight: number;
 }
 
 function define(id: string, spec: InstrumentSpec): Instrument {
@@ -73,86 +64,23 @@ function define(id: string, spec: InstrumentSpec): Instrument {
     clef: spec.clef ?? 'treble',
     isPercussion: spec.isPercussion ?? false,
     velocityOffset: spec.velocityOffset ?? 0,
+    sectionSize: spec.sectionSize ?? 1,
+    weight: spec.weight ?? 1,
   });
 }
 
 /**
- * Catalogo inicial. En la fase de orquestacion esto pasa a un JSON de datos
- * con la orquesta completa; la forma del tipo ya esta preparada para eso, asi
- * que anadir instrumentos no obligara a tocar codigo.
+ * Catalogo de instrumentos, construido a partir de los datos de `catalog.ts`.
+ *
+ * Los datos y su interpretacion viven separados a proposito: anadir un
+ * instrumento es anadir una entrada al literal, sin tocar esta funcion ni
+ * ninguna otra.
  */
-export const INSTRUMENTS: Readonly<Record<string, Instrument>> = Object.freeze({
-  piano: define('piano', {
-    name: 'Piano', family: 'keyboard', midiProgram: 0,
-    range: ['A-1', 'C7'], tessitura: ['C1', 'C6'], clef: 'treble',
-  }),
-  violin: define('violin', {
-    name: 'Violin', family: 'strings', midiProgram: 40,
-    range: ['G3', 'A7'], tessitura: ['G3', 'E6'], clef: 'treble',
-  }),
-  viola: define('viola', {
-    name: 'Viola', family: 'strings', midiProgram: 41,
-    range: ['C3', 'E6'], tessitura: ['C3', 'A5'], clef: 'alto',
-  }),
-  cello: define('cello', {
-    name: 'Violonchelo', family: 'strings', midiProgram: 42,
-    range: ['C2', 'C6'], tessitura: ['C2', 'A4'], clef: 'bass',
-  }),
-  contrabass: define('contrabass', {
-    name: 'Contrabajo', family: 'strings', midiProgram: 43,
-    range: ['C1', 'C4'], tessitura: ['E1', 'G3'], clef: 'bass',
-    transposition: '-P8', velocityOffset: 4,
-  }),
-  flute: define('flute', {
-    name: 'Flauta', family: 'woodwind', midiProgram: 73,
-    range: ['C4', 'D7'], tessitura: ['D4', 'G6'], clef: 'treble', velocityOffset: -4,
-  }),
-  oboe: define('oboe', {
-    name: 'Oboe', family: 'woodwind', midiProgram: 68,
-    range: ['Bb3', 'A6'], tessitura: ['D4', 'D6'], clef: 'treble',
-  }),
-  clarinet: define('clarinet', {
-    name: 'Clarinete en Sib', family: 'woodwind', midiProgram: 71,
-    range: ['D3', 'Bb6'], tessitura: ['E3', 'C6'], clef: 'treble', transposition: '-M2',
-  }),
-  bassoon: define('bassoon', {
-    name: 'Fagot', family: 'woodwind', midiProgram: 70,
-    range: ['Bb1', 'Eb5'], tessitura: ['C2', 'C4'], clef: 'bass',
-  }),
-  horn: define('horn', {
-    name: 'Trompa en Fa', family: 'brass', midiProgram: 60,
-    range: ['B1', 'F5'], tessitura: ['C3', 'C5'], clef: 'treble', transposition: '-P5',
-  }),
-  trumpet: define('trumpet', {
-    name: 'Trompeta en Sib', family: 'brass', midiProgram: 56,
-    range: ['E3', 'D6'], tessitura: ['G3', 'Bb5'], clef: 'treble',
-    transposition: '-M2', velocityOffset: 6,
-  }),
-  trombone: define('trombone', {
-    name: 'Trombon', family: 'brass', midiProgram: 57,
-    range: ['E2', 'F5'], tessitura: ['G2', 'Bb4'], clef: 'bass', velocityOffset: 5,
-  }),
-  tuba: define('tuba', {
-    name: 'Tuba', family: 'brass', midiProgram: 58,
-    range: ['D1', 'F4'], tessitura: ['F1', 'F3'], clef: 'bass', velocityOffset: 4,
-  }),
-  timpani: define('timpani', {
-    name: 'Timbales', family: 'percussion', midiProgram: 47,
-    range: ['D2', 'C4'], tessitura: ['F2', 'F3'], clef: 'bass',
-  }),
-  drums: define('drums', {
-    name: 'Bateria', family: 'percussion', midiProgram: 0,
-    range: ['C1', 'B5'], tessitura: ['C1', 'B5'], clef: 'percussion', isPercussion: true,
-  }),
-  synth_bass: define('synth_bass', {
-    name: 'Bajo sintetizado', family: 'electronic', midiProgram: 38,
-    range: ['C1', 'C4'], tessitura: ['E1', 'G3'], clef: 'bass',
-  }),
-  synth_lead: define('synth_lead', {
-    name: 'Lead sintetizado', family: 'electronic', midiProgram: 80,
-    range: ['C2', 'C7'], tessitura: ['C3', 'C6'], clef: 'treble',
-  }),
-});
+export const INSTRUMENTS: Readonly<Record<string, Instrument>> = Object.freeze(
+  Object.fromEntries(
+    Object.entries(INSTRUMENT_SPECS).map(([id, spec]) => [id, define(id, spec)]),
+  ),
+);
 
 export function getInstrument(id: string): Instrument | undefined {
   return INSTRUMENTS[id];

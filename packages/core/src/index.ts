@@ -81,6 +81,12 @@ export {
   type InstrumentFamily,
   type RangeVerdict,
 } from './instrument/instrument.js';
+export {
+  ENSEMBLE_PRESETS,
+  INSTRUMENT_SPECS,
+  type EnsemblePreset,
+  type InstrumentSpec,
+} from './instrument/catalog.js';
 
 // ----------------------------------------------------------------- notacion
 export {
@@ -122,4 +128,13 @@ export {
 export { Voice, type PositionedEvent } from './structure/voice.js';
 export { DEFAULT_VOICE_ID, Part } from './structure/part.js';
 export { Movement } from './structure/movement.js';
+export {
+  distributeMeasures,
+  FormPlan,
+  FORM_TEMPLATES,
+  type FormTemplate,
+  type Section,
+  type SectionInput,
+  type SectionRole,
+} from './structure/section.js';
 export { Score, type ScoreMetadata, type ScoreSummary } from './structure/score.js';

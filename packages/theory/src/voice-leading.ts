@@ -45,6 +45,17 @@ export interface VoiceLeadingOptions {
   readonly maxLeap?: number;
   /** Comprobar cruces y solapamientos. Por defecto si. */
   readonly checkCrossing?: boolean;
+  /**
+   * Tratar como UNA voz los pares que se doblan al unisono o en octavas.
+   * Activo por defecto.
+   */
+  readonly ignoreDoublings?: boolean;
+}
+
+export interface VoiceLeadingSummary {
+  readonly issues: readonly VoiceLeadingIssue[];
+  /** Pares de voces detectados como doblaje, no como voces independientes. */
+  readonly doublings: readonly (readonly [string, string])[];
 }
 
 /**
@@ -57,18 +68,77 @@ export function checkVoiceLeading(
   voices: readonly LabeledVoice[],
   options: VoiceLeadingOptions = {},
 ): VoiceLeadingIssue[] {
+  return [...analyzeVoiceLeading(voices, options).issues];
+}
+
+/**
+ * Igual que `checkVoiceLeading` pero informando ademas de que pares se
+ * detectaron como doblaje.
+ */
+export function analyzeVoiceLeading(
+  voices: readonly LabeledVoice[],
+  options: VoiceLeadingOptions = {},
+): VoiceLeadingSummary {
   const verticalities = extractVerticalities(voices);
   const labels = voices.map((entry) => entry.label);
-  const issues: VoiceLeadingIssue[] = [];
+  const doubled =
+    (options.ignoreDoublings ?? true) ? findDoublings(verticalities) : new Set<string>();
 
+  const issues: VoiceLeadingIssue[] = [];
   for (const [index, current] of verticalities.entries()) {
-    checkSimultaneous(current, labels, options, issues);
+    checkSimultaneous(current, labels, options, doubled, issues);
 
     const next = verticalities[index + 1];
-    if (next) checkMotion(current, next, labels, options, issues);
+    if (next) checkMotion(current, next, labels, options, doubled, issues);
   }
 
-  return issues;
+  return {
+    issues,
+    doublings: [...doubled].map((key) => {
+      const [a, b] = key.split(':').map(Number);
+      return [labels[a!]!, labels[b!]!] as const;
+    }),
+  };
+}
+
+/**
+ * Detecta que pares de voces son un DOBLAJE y no dos voces independientes.
+ *
+ * Sin esto, el analisis es inutil a escala orquestal. En un tutti, once
+ * instrumentos llevan la misma melodia en octavas distintas: tecnicamente son
+ * octavas paralelas en cada compas, y musicalmente son la practica orquestal
+ * normal. Contarlas como errores produce miles de avisos que entierran los
+ * pocos que si importan.
+ *
+ * El criterio es estricto: dos voces son doblaje solo si mantienen unisono u
+ * octava en TODOS los instantes en que ambas suenan. Basta un momento en que
+ * se separen para que vuelvan a ser voces independientes y se les exija
+ * independencia en todo el pasaje.
+ */
+function findDoublings(verticalities: readonly Verticality[]): Set<string> {
+  const doubled = new Set<string>();
+  const count = verticalities[0]?.pitches.length ?? 0;
+
+  for (let a = 0; a < count; a++) {
+    for (let b = a + 1; b < count; b++) {
+      let shared = 0;
+      let aligned = 0;
+
+      for (const vertical of verticalities) {
+        const lower = vertical.pitches[a];
+        const upper = vertical.pitches[b];
+        if (!lower || !upper) continue;
+        shared++;
+        if ((upper.midi - lower.midi) % 12 === 0) aligned++;
+      }
+
+      // Se exige un minimo de momentos compartidos: dos voces que solo
+      // coinciden en una nota no son un doblaje, es una casualidad.
+      if (shared >= 3 && aligned === shared) doubled.add(`${a}:${b}`);
+    }
+  }
+
+  return doubled;
 }
 
 // ------------------------------------------------- errores dentro de un acorde
@@ -77,6 +147,7 @@ function checkSimultaneous(
   vertical: Verticality,
   labels: readonly string[],
   options: VoiceLeadingOptions,
+  doubled: ReadonlySet<string>,
   issues: VoiceLeadingIssue[],
 ): void {
   const maxSpacing = options.maxSpacing ?? 12;
@@ -86,6 +157,9 @@ function checkSimultaneous(
     const below = vertical.pitches[lower];
     const above = vertical.pitches[lower + 1];
     if (!below || !above) continue;
+    // Un doblaje en octavas no es un cruce ni un espaciado excesivo: es la
+    // misma linea sonando en dos registros.
+    if (doubled.has(`${lower}:${lower + 1}`)) continue;
 
     if (checkCrossing && below.midi > above.midi) {
       issues.push({
@@ -124,6 +198,7 @@ function checkMotion(
   to: Verticality,
   labels: readonly string[],
   options: VoiceLeadingOptions,
+  doubled: ReadonlySet<string>,
   issues: VoiceLeadingIssue[],
 ): void {
   checkMelodicIntervals(from, to, labels, options, issues);
@@ -135,6 +210,7 @@ function checkMotion(
       const b1 = from.pitches[upper];
       const b2 = to.pitches[upper];
       if (!a1 || !a2 || !b1 || !b2) continue;
+      if (doubled.has(`${lower}:${upper}`)) continue;
 
       const pair = [labels[lower]!, labels[upper]!];
       checkParallels(a1, a2, b1, b2, pair, to.position, issues);

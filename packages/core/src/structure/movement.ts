@@ -2,6 +2,7 @@ import { DomainError } from '../errors.js';
 import type { Instrument } from '../instrument/instrument.js';
 import { Duration } from '../time/duration.js';
 import { Part } from './part.js';
+import { FormPlan } from './section.js';
 import { Timeline } from './timeline.js';
 
 /**
@@ -17,6 +18,8 @@ export class Movement {
   /** Indicacion de caracter: "Allegro con brio", "Andante cantabile". */
   marking: string | undefined;
   readonly timeline: Timeline;
+  /** Plan formal: las secciones del movimiento en orden. */
+  readonly form = new FormPlan();
   private readonly partMap = new Map<string, Part>();
 
   constructor(id: string, title: string, timeline: Timeline = new Timeline()) {
