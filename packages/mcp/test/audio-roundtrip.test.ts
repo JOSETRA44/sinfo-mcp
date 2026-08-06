@@ -2,7 +2,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Duration, isRest } from '@sinfo/core';
-import { AudioFileLoader } from '@sinfo/mir';
+import { AudioFileLoader, SidecarClient } from '@sinfo/mir';
 import { performanceToScore } from '@sinfo/transcribe';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -95,6 +95,18 @@ function encodeWav(samples: Float32Array, sampleRate: number): Uint8Array {
   return bytes;
 }
 
+/**
+ * Cargador con el sidecar deliberadamente AUSENTE.
+ *
+ * Estas pruebas son del detector propio, el que funciona sin Python. Si se
+ * dejara que encontrase el sidecar cuando esta instalado, medirian otro motor
+ * y cambiarian de significado segun la maquina: en la del que tiene los
+ * modelos pasarian por un lado y en la de integracion continua por otro, sin
+ * que nadie lo notara. Lo que se prueba aqui es el suelo garantizado.
+ */
+const fallbackLoader = (): AudioFileLoader =>
+  new AudioFileLoader({ sidecar: new SidecarClient({ command: 'sinfo-mir-ausente-a-proposito' }) });
+
 let directory: string;
 
 async function writeClip(name: string, samples: Float32Array): Promise<string> {
@@ -127,7 +139,7 @@ afterAll(async () => {
 describe('ida y vuelta por audio', () => {
   it('recupera las alturas de una melodia monofonica', async () => {
     const path = await writeClip('escala.wav', synthesize());
-    const performance = await new AudioFileLoader().load(path, { bpm: BPM });
+    const performance = await fallbackLoader().load(path, { bpm: BPM });
 
     expect(performance.tracks[0]?.notes).toHaveLength(MELODY.length);
 
@@ -137,7 +149,7 @@ describe('ida y vuelta por audio', () => {
 
   it('recupera el ritmo cuando se le declara el tempo', async () => {
     const path = await writeClip('escala.wav', synthesize());
-    const performance = await new AudioFileLoader().load(path, { bpm: BPM });
+    const performance = await fallbackLoader().load(path, { bpm: BPM });
     const result = performanceToScore(performance);
 
     const onsets = performance.tracks[0]?.notes.map((note) => note.onset) ?? [];
@@ -149,7 +161,7 @@ describe('ida y vuelta por audio', () => {
 
   it('afina cada nota dentro de un cuarto de tono', async () => {
     const path = await writeClip('escala.wav', synthesize());
-    const performance = await new AudioFileLoader().load(path, { bpm: BPM });
+    const performance = await fallbackLoader().load(path, { bpm: BPM });
 
     performance.tracks[0]?.notes.forEach((note, index) => {
       const expected = MELODY[index]?.midi ?? 0;
@@ -175,7 +187,7 @@ describe('ida y vuelta por audio', () => {
     }
 
     const path = await writeClip('repetida.wav', samples);
-    const performance = await new AudioFileLoader().load(path, { bpm: BPM });
+    const performance = await fallbackLoader().load(path, { bpm: BPM });
     expect(performance.tracks[0]?.notes).toHaveLength(2);
   });
 
@@ -183,7 +195,7 @@ describe('ida y vuelta por audio', () => {
     // Sin rejilla no hay contra que medir. El aviso es la unica forma de que
     // el agente sepa que el ritmo puede no significar nada.
     const path = await writeClip('escala.wav', synthesize());
-    const performance = await new AudioFileLoader().load(path);
+    const performance = await fallbackLoader().load(path);
     const result = performanceToScore(performance);
 
     expect(result.warnings.some((warning) => warning.includes('rejilla de pulso'))).toBe(true);
@@ -191,13 +203,13 @@ describe('ida y vuelta por audio', () => {
 
   it('rechaza un archivo mudo con un mensaje util', async () => {
     const path = await writeClip('mudo.wav', new Float32Array(RATE));
-    await expect(new AudioFileLoader().load(path)).rejects.toThrow(/mudo/);
+    await expect(fallbackLoader().load(path)).rejects.toThrow(/mudo/);
   });
 
   it('rechaza formatos comprimidos en vez de intentarlo a medias', async () => {
     const path = join(directory, 'cancion.mp3');
     await writeFile(path, new Uint8Array([0, 1, 2]));
-    await expect(new AudioFileLoader().load(path)).rejects.toThrow(/WAV sin comprimir/);
+    await expect(fallbackLoader().load(path)).rejects.toThrow(/WAV sin comprimir/);
   });
 
   it('ante un acorde devuelve una sola nota, que es su limite conocido', async () => {
@@ -215,7 +227,7 @@ describe('ida y vuelta por audio', () => {
     }
 
     const path = await writeClip('acorde.wav', samples);
-    const performance = await new AudioFileLoader().load(path, { bpm: BPM });
+    const performance = await fallbackLoader().load(path, { bpm: BPM });
     const simultaneous = performance.tracks[0]?.notes.filter((note) => note.onset < 0.3) ?? [];
     expect(simultaneous.length).toBeLessThanOrEqual(1);
   });
