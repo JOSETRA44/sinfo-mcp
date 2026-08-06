@@ -23,17 +23,19 @@ Los archivos exportados van a `./sinfo-out/<scoreId>/`. Se cambia con la variabl
 
 ```
 score_create          abre la obra y devuelve un scoreId
-part_add              un instrumento por parte  (instruments_list para el catálogo)
+ensemble_add          monta un conjunto completo de una llamada
+plan_form             reparte el movimiento en secciones con su plan tonal
 motif_create          guarda una célula temática
 motif_develop         inversión, retrogradación, aumentación, secuencia…
 melody_generate       melodía sobre una progresión, con contorno y semilla
 counterpoint_add      una voz contra otra, por búsqueda con retroceso
+orchestrate           reparte el material entre toda la orquesta
 harmony_progression   convierte I-vi-ii-V7-I en acordes reales
 part_write            escribe la música en notación de texto
 analyze_harmony       qué función cumple lo escrito, y dónde hay cadencias
 check_voice_leading   quintas y octavas paralelas, cruces, saltos
 check_ranges          nadie toca notas imposibles
-export                saca el .mid o el .musicxml
+export                .mid  .musicxml  .svg  .wav  .json
 ```
 
 La partitura no se reenvía nunca: se referencia por `scoreId`. `score_describe` da el resumen y `part_read` devuelve fragmentos acotados por compases.
@@ -84,9 +86,9 @@ mcp  →  render  →  engine  →  core
 |---|---|---|
 | `@sinfo/core` | Dominio: altura, duración, evento, voz, parte, movimiento, partitura, notación, división en compases | **ninguna** |
 | `@sinfo/theory` | Escalas, acordes, números romanos, cadencias, conducción de voces | core |
-| `@sinfo/generate` | Motivos, melodía por restricciones, contrapunto, PRNG determinista | core, theory |
+| `@sinfo/generate` | Motivos, melodía por restricciones, contrapunto, orquestación, PRNG determinista | core, theory |
 | `@sinfo/engine` | Casos de uso, sesiones y puertos de salida | core, theory, generate |
-| `@sinfo/render` | Adaptadores de formato: MIDI y MusicXML | core, engine |
+| `@sinfo/render` | Adaptadores de formato: MIDI, MusicXML, SVG y audio WAV | core, engine |
 | `sinfo-mcp` | Herramientas MCP y raíz de composición | todos |
 
 `@sinfo/theory` tampoco tiene dependencias externas. El plan preveía apoyarse en `tonal`, pero esa librería trabaja con cadenas de texto (`"C#4"`, `"Cmaj7"`) y aquí todo son objetos que conservan la ortografía: cada conversión de ida y vuelta es un sitio donde Do♯ puede volver como Re♭. Un acorde es una tónica más un patrón de intervalos — sale más corto construirlo que traducirlo.
@@ -129,13 +131,35 @@ El contrapunto usa **búsqueda con retroceso**, no elección nota a nota. Las re
 
 Lo generado se somete al **mismo analizador** que critica lo escrito a mano: el test comprueba que el contrapunto pasa `check_voice_leading` sin una sola paralela.
 
+## Escala sinfónica
+
+El catálogo cubre **47 instrumentos** con rango, tesitura, transposición, tamaño de sección y peso dinámico. Vive como datos en `catalog.ts`: añadir un instrumento es añadir una entrada, y una altura mal escrita revienta el build en vez de fallar cuando alguien orqueste para él. Once **plantillas de conjunto** montan desde un cuarteto de cuerda a una orquesta sinfónica de 30 partes en una sola llamada.
+
+`plan_form` reparte el movimiento en secciones según ocho formas (sonata, rondó, tema y variaciones, minueto y trío, verso-estribillo…) con sus proporciones habituales y su plan tonal: el segundo tema de una sonata va a la dominante si la obra está en mayor y al relativo mayor si está en menor.
+
+`orchestrate` decide quién lleva la melodía, la armonía y el bajo, ajusta cada línea al registro cómodo **por octavas** (nunca por otro intervalo, que cambiaría la tonalidad) y aplica la transposición de cada instrumento. Comprueba el balance con el peso real de cada sección: una flauta contra tres trombones queda enterrada aunque las dos líneas estén bien escritas.
+
+`check_voice_leading` **detecta doblajes**. En un tutti, once instrumentos llevan la misma melodía en octavas: técnicamente son octavas paralelas y musicalmente son la práctica orquestal normal. Dos voces que mantienen unísono u octava en todo el pasaje se tratan como una sola línea. Sin eso, un movimiento sinfónico daba 1313 «errores» que enterraban los pocos reales; con eso, 162.
+
+## Ver y escuchar
+
+`export format:"svg"` graba la partitura con **Verovio** (C++ compilado a WebAssembly: calidad profesional, cero dependencias nativas). Es la única salida que el propio agente puede revisar — un modelo multimodal mira la imagen y comprueba que la notación quedó legible, algo que no se ve en los datos.
+
+`export format:"wav"` sintetiza el audio con **spessasynth_core**, alimentando el sintetizador con eventos directos desde la partitura: sin rodeo por bytes MIDI y con la posición de cada nota calculada en muestras exactas desde las fracciones del dominio. Respeta los cambios de tempo.
+
+Seamos claros sobre a quién sirve cada cosa: el agente **no puede oír** el WAV — el audio es para la persona. Lo que sí puede verificar por su cuenta es la partitura grabada.
+
+Sin SoundFont configurado se usa un banco mínimo de un solo sonido: sirve para comprobar que la cadena funciona, no para escuchar la obra. Para eso, instala un SoundFont General MIDI y apúntalo con `SINFO_SOUNDFONT`. Si el resultado sale mudo, el propio `export` lo avisa en vez de entregar un archivo silencioso.
+
 ## Estado
 
-Funciona hoy: estructura de obra y movimientos, escritura en ambas notaciones, validación de compases, armonía funcional y análisis, conducción de voces, material temático y contrapunto reproducibles, comprobación de rangos con transposición, y exportación a **MIDI**, **MusicXML** y JSON.
+Funciona hoy: estructura de obra y movimientos, plan formal, conjuntos predefinidos, escritura en ambas notaciones, validación de compases, armonía funcional y análisis, conducción de voces con detección de doblajes, material temático y contrapunto reproducibles, orquestación con balance, comprobación de rangos con transposición, y exportación a **MIDI**, **MusicXML**, **SVG** y **WAV**.
+
+Un primer movimiento sinfónico completo —30 partes, forma sonata de 160 compases, tema generado, orquestación tutti, verificación y doble exportación— se compone en **menos de medio segundo**.
 
 El MusicXML sale listo para MuseScore, Sibelius, Finale y Dorico: parte notas en las barras con ligaduras, escribe grupos irregulares con su corchete, declara la transposición de los instrumentos transpositores, usa `unpitched` en percusión y alinea todas las partes al mismo número de compases. Verificado abriéndolo en MuseScore.
 
-Previsto: forma y orquestación a escala sinfónica, groove y humanización, y exportación a LilyPond, partitura SVG y audio.
+Previsto: groove y humanización rítmica, y exportación a LilyPond y ABC.
 
 ## Licencia
 
