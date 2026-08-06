@@ -80,6 +80,14 @@ def _cmd_describe(_: argparse.Namespace) -> dict[str, Any]:
     return describe()
 
 
+def _cmd_decode(args: argparse.Namespace) -> dict[str, Any]:
+    _require("decode")
+    from .decode import decode_audio
+
+    path = _input_path(args.input)
+    return decode_audio(path, Path(args.out), args.sample_rate)
+
+
 def _cmd_beats(args: argparse.Namespace) -> dict[str, Any]:
     _require("beats")
     from .beats import track_beats
@@ -119,6 +127,14 @@ def build_parser() -> argparse.ArgumentParser:
         "describe", help="Que modelos hay instalados y que falta. Nunca falla."
     )
     described.set_defaults(handler=_cmd_describe)
+
+    decode = subcommands.add_parser(
+        "decode", help="Convierte cualquier formato de audio en un WAV mono."
+    )
+    decode.add_argument("--input", required=True)
+    decode.add_argument("--out", required=True)
+    decode.add_argument("--sample-rate", type=int, default=None, dest="sample_rate")
+    decode.set_defaults(handler=_cmd_decode)
 
     beats = subcommands.add_parser("beats", help="Pulso, tiempos fuertes y tempo.")
     beats.add_argument("--input", required=True)

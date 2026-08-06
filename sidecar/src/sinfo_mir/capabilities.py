@@ -68,6 +68,13 @@ def describe() -> dict[str, Any]:
         "python": platform.python_version(),
         "platform": sys.platform,
         "capabilities": [
+            # Va primero porque es la mas barata y la que mas amplia lo que se
+            # puede intentar: sin ella el servidor solo lee WAV.
+            _capability(
+                "decode",
+                {"soundfile": "soundfile", "numpy": "numpy"},
+                "notes",
+            ).to_dict(),
             _capability(
                 "beats",
                 {"beat_this": "beat_this", "torch": "torch", "soundfile": "soundfile"},
