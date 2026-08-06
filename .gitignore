@@ -22,4 +22,4 @@ out/
 .DS_Store
 .env
 .env.local
-*.log
+*.logsinfo-out/
