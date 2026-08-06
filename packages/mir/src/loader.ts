@@ -23,6 +23,10 @@ const MIDI_EXTENSIONS = new Set(['.mid', '.midi', '.smf']);
 export class MidiFileLoader implements PerformanceLoader {
   readonly capabilities: readonly PerformanceCapability[] = ['midi'];
 
+  accepts(path: string): boolean {
+    return MIDI_EXTENSIONS.has(extname(path).toLowerCase());
+  }
+
   async load(path: string, options: LoadPerformanceOptions = {}): Promise<Performance> {
     const extension = extname(path).toLowerCase();
     if (!MIDI_EXTENSIONS.has(extension)) {

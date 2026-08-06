@@ -14,3 +14,11 @@ export type { ReadMidiOptions } from './midi/reader.js';
 export { readMidi } from './midi/reader.js';
 
 export { MidiFileLoader } from './loader.js';
+export { FileLoader } from './file-loader.js';
+
+export { AudioFileLoader } from './audio/loader.js';
+export { decodeWav, WavDecodeError } from './audio/wav.js';
+export type { PitchPoint, YinOptions } from './audio/yin.js';
+export { detectPitch } from './audio/yin.js';
+export type { SegmentOptions } from './audio/segment.js';
+export { frequencyToMidi, segmentNotes } from './audio/segment.js';
