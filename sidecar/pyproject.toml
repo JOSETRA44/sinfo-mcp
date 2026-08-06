@@ -23,7 +23,12 @@ beats = ["beat-this @ git+https://github.com/CPJKU/beat_this.git", "torch>=2.0",
 separate = ["demucs>=4.0", "torch>=2.0", "soundfile>=0.12"]
 
 # Transcripcion polifonica y multi-instrumento.
-notes = ["basic-pitch>=0.4", "soundfile>=0.12"]
+#
+# `setuptools` va explicito porque basic-pitch todavia importa `pkg_resources`,
+# que sale de ahi. Hasta Python 3.11 se colaba solo en cualquier entorno; desde
+# 3.12 ya no viene de serie, asi que sin declararlo la instalacion parece
+# correcta y revienta al primer uso con un ModuleNotFoundError desconcertante.
+notes = ["basic-pitch>=0.4", "soundfile>=0.12", "setuptools>=68,<81"]
 
 all = ["sinfo-mir[beats,separate,notes]"]
 
