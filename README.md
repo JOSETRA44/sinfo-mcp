@@ -24,9 +24,13 @@ Los archivos exportados van a `./sinfo-out/<scoreId>/`. Se cambia con la variabl
 ```
 score_create          abre la obra y devuelve un scoreId
 part_add              un instrumento por parte  (instruments_list para el catálogo)
+motif_create          guarda una célula temática
+motif_develop         inversión, retrogradación, aumentación, secuencia…
+melody_generate       melodía sobre una progresión, con contorno y semilla
+counterpoint_add      una voz contra otra, por búsqueda con retroceso
 harmony_progression   convierte I-vi-ii-V7-I en acordes reales
 part_write            escribe la música en notación de texto
-analyze_harmony       qué funciona cumple lo escrito, y dónde hay cadencias
+analyze_harmony       qué función cumple lo escrito, y dónde hay cadencias
 check_voice_leading   quintas y octavas paralelas, cruces, saltos
 check_ranges          nadie toca notas imposibles
 export                saca el .mid o el .musicxml
@@ -80,7 +84,8 @@ mcp  →  render  →  engine  →  core
 |---|---|---|
 | `@sinfo/core` | Dominio: altura, duración, evento, voz, parte, movimiento, partitura, notación, división en compases | **ninguna** |
 | `@sinfo/theory` | Escalas, acordes, números romanos, cadencias, conducción de voces | core |
-| `@sinfo/engine` | Casos de uso, sesiones y puertos de salida | core, theory |
+| `@sinfo/generate` | Motivos, melodía por restricciones, contrapunto, PRNG determinista | core, theory |
+| `@sinfo/engine` | Casos de uso, sesiones y puertos de salida | core, theory, generate |
 | `@sinfo/render` | Adaptadores de formato: MIDI y MusicXML | core, engine |
 | `sinfo-mcp` | Herramientas MCP y raíz de composición | todos |
 
@@ -112,13 +117,25 @@ El modo menor recibe el trato que exige. Se construye con la escala armónica, a
 
 `check_voice_leading` separa **errores** de **avisos**: las quintas y octavas paralelas funden dos voces en una y son error; los cruces, solapamientos, quintas directas, espaciados anchos y saltos grandes son avisos. Cada uno dice en qué compás está, entre qué voces y por qué importa.
 
+## Generación
+
+Toda la aleatoriedad pasa por un PRNG **determinista**: la misma semilla con los mismos parámetros da exactamente la misma música, en cualquier máquina. Es lo que permite al agente iterar — «esa melodía me gustaba, dame otra vez esa y cámbiame solo el contorno».
+
+Cada tipo de decisión consume un **sub-flujo propio** (`Random.fork('ritmo')`). Sin eso, tocar el algoritmo de las alturas desplazaría todos los números siguientes y el ritmo cambiaría también, aunque no se hubiera tocado.
+
+La melodía se construye con **restricciones puntuables**, no con una función llena de condicionales: rango, nota del acorde en tiempo fuerte, grado conjunto, resolución de saltos, contorno, cierre estable. Las puntuaciones se multiplican, así que un solo cero veta al candidato — el rango del instrumento no se negocia con el gusto por el grado conjunto. Añadir un criterio es escribir una función y sumarla a una lista.
+
+El contrapunto usa **búsqueda con retroceso**, no elección nota a nota. Las reglas se condicionan entre sí: una elección correcta en el compás 5 puede dejar el 6 sin ninguna salida legal, y un algoritmo voraz se atasca ahí. Si no existe solución estricta cede reglas de estilo por orden — nunca las disonancias — y dice cuáles cedió.
+
+Lo generado se somete al **mismo analizador** que critica lo escrito a mano: el test comprueba que el contrapunto pasa `check_voice_leading` sin una sola paralela.
+
 ## Estado
 
-Funciona hoy: estructura de obra y movimientos, escritura en ambas notaciones, validación de compases, armonía funcional y análisis, conducción de voces, comprobación de rangos con transposición, y exportación a **MIDI**, **MusicXML** y JSON.
+Funciona hoy: estructura de obra y movimientos, escritura en ambas notaciones, validación de compases, armonía funcional y análisis, conducción de voces, material temático y contrapunto reproducibles, comprobación de rangos con transposición, y exportación a **MIDI**, **MusicXML** y JSON.
 
 El MusicXML sale listo para MuseScore, Sibelius, Finale y Dorico: parte notas en las barras con ligaduras, escribe grupos irregulares con su corchete, declara la transposición de los instrumentos transpositores, usa `unpitched` en percusión y alinea todas las partes al mismo número de compases. Verificado abriéndolo en MuseScore.
 
-Previsto: generación de material temático y contrapunto, forma y orquestación a escala sinfónica, ritmos y groove, y exportación a LilyPond, partitura SVG y audio.
+Previsto: forma y orquestación a escala sinfónica, groove y humanización, y exportación a LilyPond, partitura SVG y audio.
 
 ## Licencia
 
