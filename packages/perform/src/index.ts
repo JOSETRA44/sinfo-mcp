@@ -29,6 +29,9 @@ export {
   sortPerformance,
 } from './performance.js';
 
+export type { AudioClip } from './audio.js';
+export { audioClip, clipDuration, clipLevel } from './audio.js';
+
 export type { BeatGrid } from './grid.js';
 
 export {

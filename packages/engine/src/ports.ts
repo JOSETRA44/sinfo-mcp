@@ -130,6 +130,24 @@ export type PerformanceCapability = 'midi' | 'audio';
 export interface LoadPerformanceOptions {
   /** Nombre para la procedencia; por defecto, el del archivo. */
   readonly name?: string | undefined;
+  /**
+   * Tempo declarado, en negras por minuto.
+   *
+   * Un archivo MIDI trae su propio mapa de tempo y no lo necesita. El audio
+   * si: sin seguidor de pulso no hay contra que medir, y el cuantizador
+   * tendria que suponer un tempo. Declararlo es la diferencia entre un ritmo
+   * correcto y uno inventado, asi que se pide en vez de adivinarlo.
+   */
+  readonly bpm?: number | undefined;
+  /**
+   * Instrumento que suena, por id del catalogo.
+   *
+   * Es la misma decision que toman los transcriptores comerciales: en vez de
+   * adivinar el timbre —problema abierto y donde mas se falla— se pregunta.
+   * Aqui ademas sirve para acotar el rango de busqueda del detector, que evita
+   * de raiz los errores de octava.
+   */
+  readonly instrumentId?: string | undefined;
 }
 
 /**
@@ -146,6 +164,14 @@ export interface LoadPerformanceOptions {
  */
 export interface PerformanceLoader {
   readonly capabilities: readonly PerformanceCapability[];
+  /**
+   * Si este cargador se hace cargo de esa ruta.
+   *
+   * Permite despachar entre varios sin tenerlos que probar a ver cual falla,
+   * y sobre todo permite dar un error util —"conozco .mid y .wav"— en vez del
+   * error del ultimo que lo intento.
+   */
+  accepts(path: string): boolean;
   load(path: string, options?: LoadPerformanceOptions): Promise<Performance>;
 }
 

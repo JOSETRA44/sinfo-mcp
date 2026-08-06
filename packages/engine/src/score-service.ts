@@ -52,7 +52,7 @@ import {
 } from './operations/reading.js';
 import { setTimeline, type SetTimelineInput } from './operations/timeline.js';
 import { clearPart, writePart, type ClearPartInput, type WritePartInput } from './operations/writing.js';
-import type { EnginePorts } from './ports.js';
+import type { EnginePorts, LoadPerformanceOptions } from './ports.js';
 import { InMemorySessionStore, recordAction, type SessionStore } from './session/session-store.js';
 
 export interface ScoreServiceOptions {
@@ -100,7 +100,11 @@ export class ScoreService {
    * cuantizarla sin releer nada. Es la diferencia entre poder afinar el
    * resultado y tener que empezar de cero en cada intento.
    */
-  async importFile(path: string, options: ToScoreOptions = {}) {
+  async importFile(
+    path: string,
+    options: ToScoreOptions = {},
+    load: LoadPerformanceOptions = {},
+  ) {
     const loader = this.ports.loader;
     if (!loader) {
       fail(
@@ -110,7 +114,7 @@ export class ScoreService {
       );
     }
 
-    const performance = await loader.load(path);
+    const performance = await loader.load(path, load);
     const { score, summary } = importPerformance(this.generateId(), performance, options);
     const session = this.store.create(score);
     session.performance = performance;
