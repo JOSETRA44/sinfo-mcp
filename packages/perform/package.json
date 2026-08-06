@@ -1,0 +1,26 @@
+{
+  "name": "@sinfo/perform",
+  "version": "0.1.0",
+  "description": "Interpretacion cruda: notas con tiempos en segundos, rejilla de pulso y procedencia. La costura entre el analisis de audio y la notacion.",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "source": "./src/index.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc --build"
+  },
+  "dependencies": {
+    "@sinfo/core": "0.1.0"
+  }
+}
