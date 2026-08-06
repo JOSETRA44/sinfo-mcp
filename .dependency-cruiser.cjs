@@ -26,7 +26,11 @@ const ALLOWED = {
   theory: ['core'],
   generate: ['core', 'theory'],
   engine: ['core', 'theory', 'generate'],
-  render: ['core', 'engine'],
+  // render puede usar theory y generate: son capas MAS INTERNAS, asi que la
+  // flecha sigue apuntando hacia dentro. El groove es un ejemplo: es
+  // interpretacion y se aplica al exportar, pero necesita el PRNG determinista
+  // y la aritmetica musical que viven ahi.
+  render: ['core', 'theory', 'generate', 'engine'],
   mcp: ['core', 'theory', 'generate', 'engine', 'render'],
 };
 

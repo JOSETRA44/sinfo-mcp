@@ -151,6 +151,14 @@ Seamos claros sobre a quién sirve cada cosa: el agente **no puede oír** el WAV
 
 Sin SoundFont configurado se usa un banco mínimo de un solo sonido: sirve para comprobar que la cadena funciona, no para escuchar la obra. Para eso, instala un SoundFont General MIDI y apúntalo con `SINFO_SOUNDFONT`. Si el resultado sale mudo, el propio `export` lo avisa en vez de entregar un archivo silencioso.
 
+## Groove
+
+`export groove:"swing" humanize:0.3` cambia **cómo suena** el MIDI y el audio, no lo que aparece en la partitura. Es la distinción correcta: un pasaje con swing se escribe con corcheas rectas y el intérprete lo balancea; escribirlo en tresillos sería notación incorrecta e ilegible. Por eso el groove es un parámetro de `export` y no toca `@sinfo/core`.
+
+Siete grooves —recto, swing, shuffle, atrasado, adelantado, funk, vals— con su balanceo, su empuje y su patrón de acentos. La humanización descuadra el tiempo y varía la intensidad; cada parte usa su propio sub-flujo aleatorio, porque si todas se descuadraran igual sonaría a grabación desplazada, no a músicos tocando juntos.
+
+Las proporciones de balanceo se guardan como **fracciones exactas**, no decimales: con 0.667 el swing de tresillo caía en 667/4000 de redonda en vez de 1/6, metiendo denominadores absurdos en un dominio construido entero sobre aritmética racional.
+
 ## Estado
 
 Funciona hoy: estructura de obra y movimientos, plan formal, conjuntos predefinidos, escritura en ambas notaciones, validación de compases, armonía funcional y análisis, conducción de voces con detección de doblajes, material temático y contrapunto reproducibles, orquestación con balance, comprobación de rangos con transposición, y exportación a **MIDI**, **MusicXML**, **SVG** y **WAV**.
