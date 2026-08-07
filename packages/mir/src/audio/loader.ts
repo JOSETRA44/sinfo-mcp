@@ -11,6 +11,7 @@ import type {
 import {
   type BeatGrid,
   type Performance,
+  type PerformanceTrack,
   type RawNote,
   clipDuration,
   clipLevel,
@@ -19,6 +20,7 @@ import {
 } from '@sinfo/perform';
 import { StageCache } from '../sidecar/cache.js';
 import { SidecarClient } from '../sidecar/client.js';
+import { fetchAudio, looksLikeUrl, urlIngestEnabled } from './url.js';
 import { decodeWav } from './wav.js';
 import { segmentNotes } from './segment.js';
 import { detectPitch } from './yin.js';
@@ -42,12 +44,44 @@ const DECODABLE_EXTENSIONS = new Set([
   '.m4a',
   '.aiff',
   '.aif',
+  // Contenedores de las plataformas: YouTube entrega opus en webm o AAC en
+  // m4a segun lo que haya. Los cubre PyAV en el sidecar.
+  '.webm',
+  '.mp4',
+  '.mkv',
+  '.aac',
+  '.wma',
 ]);
 
 const AUDIO_EXTENSIONS = new Set([...NATIVE_EXTENSIONS, ...DECODABLE_EXTENSIONS]);
 
 /** Por debajo de este nivel eficaz, el archivo esta practicamente mudo. */
 const SILENT_THRESHOLD = 0.001;
+
+/**
+ * Que instrumento representa cada pista separada.
+ *
+ * Demucs devuelve cuatro pistas y ninguna es un instrumento concreto: "other"
+ * es todo lo que no es voz, bajo ni bateria, junto. Se le asigna piano no
+ * porque suene un piano, sino porque es el instrumento de registro mas ancho
+ * del catalogo y por tanto el que menos notas descarta por rango.
+ */
+const STEM_INSTRUMENTS: Readonly<Record<string, string>> = {
+  vocals: 'tenor_voice',
+  bass: 'bass_guitar',
+  other: 'piano',
+  guitar: 'guitar',
+  piano: 'piano',
+  drums: 'drums',
+};
+
+/** Tipos de voz por registro, de grave a aguda, para afinar la pista vocal. */
+const VOICE_TYPES: readonly { id: string; median: number }[] = [
+  { id: 'bass_voice', median: 45 },
+  { id: 'tenor_voice', median: 52 },
+  { id: 'alto_voice', median: 58 },
+  { id: 'soprano', median: 65 },
+];
 
 /**
  * Transcripcion de audio MONOFONICO, sin modelos ni dependencias nativas.
@@ -79,7 +113,9 @@ export class AudioFileLoader implements PerformanceLoader {
   }
 
   accepts(path: string): boolean {
-    return AUDIO_EXTENSIONS.has(extname(path).toLowerCase());
+    // Las URL se aceptan siempre para poder explicar que hay que activarlas.
+    // Rechazarlas de plano daria un "extension desconocida" desconcertante.
+    return looksLikeUrl(path) || AUDIO_EXTENSIONS.has(extname(path).toLowerCase());
   }
 
   async status(): Promise<Readonly<Record<string, unknown>>> {
@@ -96,6 +132,13 @@ export class AudioFileLoader implements PerformanceLoader {
       limitation: stages.includes('notes')
         ? undefined
         : 'Sin sidecar el detector es monofonico: una linea sola si, acordes y mezclas no.',
+      urlIngest: {
+        enabled: urlIngestEnabled(),
+        available: stages.includes('fetch'),
+        ...(urlIngestEnabled()
+          ? {}
+          : { enableWith: 'SINFO_ALLOW_URL=1', note: 'Apagada por defecto a proposito.' }),
+      },
       sidecar:
         info === null
           ? {
@@ -113,7 +156,17 @@ export class AudioFileLoader implements PerformanceLoader {
     };
   }
 
-  async load(path: string, options: LoadPerformanceOptions = {}): Promise<Performance> {
+  async load(source: string, options: LoadPerformanceOptions = {}): Promise<Performance> {
+    // Una URL se convierte en un archivo local y a partir de ahi el resto de
+    // la cadena no distingue de donde vino.
+    let path = source;
+    let downloadedTitle: string | undefined;
+    if (looksLikeUrl(source)) {
+      const fetched = await fetchAudio(source, this.sidecar, this.cache);
+      path = fetched.path;
+      downloadedTitle = fetched.title;
+    }
+
     const extension = extname(path).toLowerCase();
     if (!AUDIO_EXTENSIONS.has(extension)) {
       throw new ApplicationError(
@@ -125,7 +178,7 @@ export class AudioFileLoader implements PerformanceLoader {
     }
 
     const stages = await this.sidecar.availableStages();
-    const name = options.name ?? basename(path);
+    const name = options.name ?? downloadedTitle ?? basename(path);
 
     // Los comprimidos pasan antes por el sidecar. El WAV resultante se cachea,
     // asi que decodificar una cancion larga se paga una sola vez.
@@ -168,25 +221,104 @@ export class AudioFileLoader implements PerformanceLoader {
     // mejora el resultado cuando esta, y su ausencia no debe impedir
     // transcribir, solo acotar lo que se puede transcribir.
     const polyphonic = stages.includes('notes');
-    const notes = polyphonic
-      ? await this.notesViaSidecar(path, options.instrumentId)
-      : segmentNotes(detectPitch(clip, rangeFor(options.instrumentId)));
-
     const seconds = clipDuration(clip);
-    const grid = await this.buildGrid(path, options.bpm, seconds, stages.includes('beats'));
+
+    // Todas las etapas trabajan sobre el WAV ya decodificado, no sobre el
+    // original. Los modelos leen con las mismas librerias que fallaban con los
+    // contenedores de las plataformas, asi que darles el original volveria a
+    // estrellarse justo despues de haber resuelto el problema.
+    const grid = await this.buildGrid(wavPath, options.bpm, seconds, stages.includes('beats'));
+
+    const separating =
+      options.separateStems === true && polyphonic && stages.includes('separate');
+
+    const tracks = separating
+      ? await this.tracksFromStems(wavPath, options.instrumentId)
+      : [
+          {
+            id: 'audio',
+            name,
+            ...(options.instrumentId === undefined ? {} : { instrumentId: options.instrumentId }),
+            notes: polyphonic
+              ? await this.notesViaSidecar(wavPath, options.instrumentId)
+              : segmentNotes(detectPitch(clip, rangeFor(options.instrumentId))),
+          },
+        ];
 
     return {
-      tracks: [
-        {
-          id: 'audio',
-          name,
-          ...(options.instrumentId === undefined ? {} : { instrumentId: options.instrumentId }),
-          notes,
-        },
-      ],
+      tracks,
       ...(grid === undefined ? {} : { grid }),
-      source: { kind: 'audio', name, model: polyphonic ? 'basic_pitch' : 'yin' },
+      source: {
+        kind: 'audio',
+        name,
+        model: separating ? 'htdemucs+basic_pitch' : polyphonic ? 'basic_pitch' : 'yin',
+      },
     };
+  }
+
+  /**
+   * Separa la mezcla y transcribe cada pista por su cuenta.
+   *
+   * La bateria se salta a proposito. Un detector de alturas sobre percusion
+   * devuelve alturas sin sentido —no las hay— y escribirlas produce una parte
+   * que parece musica y no lo es. El ritmo de la bateria ya esta recogido en
+   * la rejilla de pulso, que es donde tiene sentido.
+   */
+  private async tracksFromStems(
+    path: string,
+    override: string | undefined,
+  ): Promise<PerformanceTrack[]> {
+    const stems = await this.separateViaSidecar(path);
+    const tracks: PerformanceTrack[] = [];
+
+    for (const [stem, stemPath] of Object.entries(stems)) {
+      if (stem === 'drums') continue;
+
+      const declared = override ?? STEM_INSTRUMENTS[stem] ?? 'piano';
+      const notes = await this.notesViaSidecar(stemPath, declared);
+      if (notes.length === 0) continue;
+
+      // La voz se afina despues de oirla: el catalogo tiene cuatro registros
+      // vocales y elegir el que de verdad encaja hace que la correccion de
+      // octavas trabaje con el rango correcto en vez de con uno supuesto.
+      const instrumentId =
+        override ?? (stem === 'vocals' ? pickVoiceType(notes) : (STEM_INSTRUMENTS[stem] ?? 'piano'));
+
+      tracks.push({ id: stem, name: stem, instrumentId, notes });
+    }
+
+    return tracks;
+  }
+
+  /** Separacion en pistas, cacheada: es la etapa mas cara de toda la cadena. */
+  private async separateViaSidecar(path: string): Promise<Record<string, string>> {
+    const key = await this.cache.keyFor(path, 'separate', { model: 'htdemucs' });
+    const directory = await this.cache.directoryFor(key);
+
+    const result = await this.cache.through(key, async () => {
+      return (await this.sidecar.invoke([
+        'separate',
+        '--input',
+        path,
+        '--out',
+        directory,
+      ])) as { stems?: Record<string, string> };
+    });
+
+    const stems = result.stems ?? {};
+    // Si alguien vacio la carpeta de cache pero quedo el JSON, se recalcula.
+    if (Object.values(stems).some((file) => !existsSync(file))) {
+      const fresh = (await this.sidecar.invoke([
+        'separate',
+        '--input',
+        path,
+        '--out',
+        directory,
+      ])) as { stems?: Record<string, string> };
+      await this.cache.write(key, fresh);
+      return fresh.stems ?? {};
+    }
+    return stems;
   }
 
   /**
@@ -210,6 +342,14 @@ export class AudioFileLoader implements PerformanceLoader {
 
   /** Transcripcion polifonica delegada, cacheada por contenido del archivo. */
   private async notesViaSidecar(path: string, instrumentId: string | undefined): Promise<RawNote[]> {
+    // Se probó a acotar el rango de busqueda DENTRO del modelo, pasandole las
+    // frecuencias del instrumento. Parecia obviamente mejor que filtrar
+    // despues —una octava erronea que cae dentro del rango fisico ya no se
+    // puede distinguir a posteriori— y el banco de pruebas dijo lo contrario:
+    // con el piano, cuyo registro va de 13 Hz a 2 kHz, basic-pitch pasaba a
+    // devolver CERO notas. El acotado se queda disponible en el sidecar
+    // (--min-freq, --max-freq) pero no se usa por defecto hasta entender por
+    // que rompe con registros anchos.
     const key = await this.cache.keyFor(path, 'notes', { instrument: instrumentId ?? null });
     const result = await this.cache.through(key, async () => {
       const args = ['notes', '--input', path];
@@ -248,6 +388,30 @@ export class AudioFileLoader implements PerformanceLoader {
     if (beats.length < 2) return undefined;
     return createGrid(beats, result.downbeats ?? []);
   }
+}
+
+/**
+ * Elige el registro vocal que mejor encaja con lo que se ha detectado.
+ *
+ * Se usa la MEDIANA y no la media: una nota suelta muy aguda —un grito, un
+ * falsete de adorno, un armonico que se colo— desplazaria la media lo bastante
+ * como para clasificar de soprano a un baritono.
+ */
+function pickVoiceType(notes: readonly RawNote[]): string {
+  if (notes.length === 0) return 'tenor_voice';
+  const sorted = notes.map((note) => note.midi).sort((a, b) => a - b);
+  const median = sorted[Math.floor(sorted.length / 2)] ?? 52;
+
+  let best = VOICE_TYPES[0]?.id ?? 'tenor_voice';
+  let closest = Number.POSITIVE_INFINITY;
+  for (const type of VOICE_TYPES) {
+    const distance = Math.abs(type.median - median);
+    if (distance < closest) {
+      closest = distance;
+      best = type.id;
+    }
+  }
+  return best;
 }
 
 /** Margen de busqueda a partir del rango sonante del instrumento declarado. */

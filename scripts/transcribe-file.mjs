@@ -14,9 +14,12 @@ import { AudioFileLoader } from '@sinfo/mir';
 import { VerovioRenderer } from '@sinfo/render';
 import { performanceToScore } from '@sinfo/transcribe';
 
-const [input, instrumentId] = process.argv.slice(2);
+const args = process.argv.slice(2);
+const separateStems = args.includes('--stems');
+const [input, instrumentId] = args.filter((a) => !a.startsWith('--'));
 if (!input) {
-  console.error('Uso: node scripts/transcribe-file.mjs <audio> [instrumentId]');
+  console.error('Uso: node scripts/transcribe-file.mjs <audio|url> [instrumentId] [--stems]');
+  console.error('Las URL necesitan SINFO_ALLOW_URL=1.');
   process.exit(1);
 }
 
@@ -30,17 +33,17 @@ console.log(`motor=${status.engine}  polifonico=${status.polyphonic}  pulso=${st
 const started = Date.now();
 const performance = await loader.load(input, {
   ...(instrumentId ? { instrumentId } : {}),
+  ...(separateStems ? { separateStems: true } : {}),
 });
 const elapsed = ((Date.now() - started) / 1000).toFixed(1);
 
-const raw = performance.tracks[0]?.notes ?? [];
-console.log(`\nanalisis en ${elapsed}s`);
-console.log(`notas crudas: ${raw.length}`);
-if (raw.length > 0) {
-  const lowest = Math.min(...raw.map((n) => n.midi));
-  const highest = Math.max(...raw.map((n) => n.midi));
-  const last = Math.max(...raw.map((n) => n.offset));
-  console.log(`registro: MIDI ${Math.round(lowest)}-${Math.round(highest)}  duracion ${last.toFixed(1)}s`);
+console.log(`\nanalisis en ${elapsed}s  (${performance.source?.model})`);
+for (const track of performance.tracks) {
+  const midis = track.notes.map((n) => n.midi);
+  const range = midis.length
+    ? `MIDI ${Math.round(Math.min(...midis))}-${Math.round(Math.max(...midis))}`
+    : 'sin notas';
+  console.log(`  pista "${track.id}" -> ${track.instrumentId ?? '?'}: ${track.notes.length} notas, ${range}`);
 }
 console.log(`rejilla: ${performance.grid ? `${performance.grid.beats.length} pulsos, ${performance.grid.downbeats.length} fuertes` : 'ninguna'}`);
 
@@ -58,7 +61,11 @@ for (const track of result.tracks) {
 }
 for (const warning of result.warnings) console.log(`  aviso: ${warning}`);
 
-const name = basename(input).replace(/\.[^.]+$/, '').replace(/[^\w-]+/g, '_');
+// El titulo real si vino de una URL; el nombre del archivo si vino del disco.
+const name = (performance.source?.name ?? basename(input))
+  .replace(/\.[^.]+$/, '')
+  .replace(/[^\w-]+/g, '_')
+  .slice(0, 80);
 const xml = await new VerovioRenderer().render(result.score, { format: 'musicxml' });
 await writeFile(join(OUT, `${name}.musicxml`), xml.data);
 console.log(`\nescrito out/${name}.musicxml`);

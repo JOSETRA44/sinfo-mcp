@@ -134,7 +134,17 @@ export const importAudio = defineTool({
     'Solo WAV sin comprimir. MP3 y OGG necesitan un decodificador nativo que este servidor ' +
     'evita a proposito; hay que convertirlos antes.',
   inputSchema: {
-    path: z.string().min(1).describe('Ruta al archivo .wav en el disco de la persona.'),
+    path: z
+      .string()
+      .min(1)
+      .describe(
+        'Ruta a un archivo de audio en el disco (.wav, .mp3, .flac, .m4a, .ogg...), o una URL ' +
+          'de la que descargarlo.\n\n' +
+          'Las URL estan DESACTIVADAS por defecto y hay que habilitarlas con SINFO_ALLOW_URL=1. ' +
+          'Si el usuario pide transcribir un enlace y sale desactivado, explicale que descargar ' +
+          'de plataformas como YouTube incumple sus condiciones de servicio y que activarlo es ' +
+          'decision suya: no lo presentes como un fallo de configuracion.',
+      ),
     bpm: z
       .number()
       .min(20)
@@ -149,7 +159,20 @@ export const importAudio = defineTool({
       .optional()
       .describe(
         'Que instrumento suena, por id del catalogo (instruments_list). Acota la busqueda a su ' +
-          'registro real, que es la mejor defensa contra los errores de octava.',
+          'registro real, que es la mejor defensa contra los errores de octava. Con separateStems ' +
+          'lo IMPONE a todas las pistas, asi que normalmente conviene omitirlo ahi.',
+      ),
+    separateStems: z
+      .boolean()
+      .optional()
+      .describe(
+        'Separar la mezcla en pistas antes de transcribir. Actívalo SIEMPRE que el audio sea una ' +
+          'cancion con varios instrumentos: sin esto, voz, bajo y teclado acaban amontonados en ' +
+          'una sola parte de cinco o seis voces que no representa a nadie y es ilegible. Con ' +
+          'esto, cada linea va a su parte con su instrumento.\n\n' +
+          'Necesita el sidecar. Tarda del orden de la duracion de la obra, pero se cachea: ' +
+          'reintentar sobre el mismo archivo es instantaneo. La bateria se omite porque las ' +
+          'alturas de la percusion no significan nada; su ritmo ya esta en el pulso detectado.',
       ),
     title: z.string().optional(),
     composer: z.string().optional(),
@@ -170,6 +193,7 @@ export const importAudio = defineTool({
       {
         ...(args.bpm === undefined ? {} : { bpm: args.bpm }),
         ...(args.instrumentId === undefined ? {} : { instrumentId: args.instrumentId }),
+        ...(args.separateStems === undefined ? {} : { separateStems: args.separateStems }),
       },
     ),
 });

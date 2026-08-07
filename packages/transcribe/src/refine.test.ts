@@ -148,6 +148,109 @@ describe('refineNotes: rango del instrumento', () => {
   });
 });
 
+describe('refineNotes: desplazamiento sistematico de octava', () => {
+  /** Linea de bajo entera una octava por encima de donde deberia estar. */
+  const bassLineUpAnOctave = [36, 41, 43, 36, 41, 43, 38, 36].map((midi, i) =>
+    note(midi + 12, 90, i * 0.5),
+  );
+
+  it('baja la pista entera cuando esta descolocada de octava', () => {
+    // Es el error que la correccion nota a nota NO ve: un bajo detectado una
+    // octava alto sigue dentro del rango fisico de un bajo, asi que ninguna
+    // nota parece sospechosa por separado.
+    const result = refineNotes(bassLineUpAnOctave, {
+      instrumentId: 'bass_guitar',
+      dropHarmonics: false,
+    });
+    expect(result.notes.map((n) => n.midi)).toEqual([36, 41, 43, 36, 41, 43, 38, 36]);
+    expect(result.report.notes.join(' ')).toMatch(/octava/);
+  });
+
+  it('NO toca un instrumento de tesitura ancha como el piano', () => {
+    // El centro de una tesitura de cinco octavas no significa nada: una pieza
+    // en clave de sol vive legitimamente por encima de el. Sin este freno, los
+    // acordes de piano del banco de pruebas caian del 95,7 % al 0 %.
+    const treble = [60, 64, 67, 72, 76, 79].map((midi, i) => note(midi, 90, i * 0.5));
+    const result = refineNotes(treble, { instrumentId: 'piano', dropHarmonics: false });
+    expect(result.notes.map((n) => n.midi)).toEqual([60, 64, 67, 72, 76, 79]);
+  });
+
+  it('no mueve nada si la pista ya esta centrada', () => {
+    const centred = [36, 41, 43, 36, 41, 43].map((midi, i) => note(midi, 90, i * 0.5));
+    const result = refineNotes(centred, { instrumentId: 'bass_guitar', dropHarmonics: false });
+    expect(result.notes.map((n) => n.midi)).toEqual([36, 41, 43, 36, 41, 43]);
+  });
+
+  it('no se pronuncia con muy pocas notas', () => {
+    // Con dos o tres notas, la mediana no dice nada sobre el registro de la
+    // obra y desplazarla seria adivinar.
+    const few = [note(60, 90, 0), note(62, 90, 0.5)];
+    const result = refineNotes(few, { instrumentId: 'bass_guitar', dropHarmonics: false });
+    expect(result.notes.map((n) => n.midi)).toEqual([60, 62]);
+  });
+});
+
+describe('refineNotes: monofonia', () => {
+  it('una voz no puede cantar dos notas a la vez', () => {
+    // Medido de verdad: la pista vocal separada salia con dos voces. Un
+    // cantante emite una linea; el modelo dudaba entre dos alturas y devolvia
+    // ambas solapadas.
+    const result = refineNotes([note(60, 100, 0, 1), note(62, 40, 0.3, 0.8)], {
+      instrumentId: 'alto_voice',
+      dropHarmonics: false,
+    });
+    expect(result.notes).toHaveLength(1);
+    expect(result.notes[0]?.midi).toBe(60);
+    expect(result.report.droppedOverlaps).toBe(1);
+  });
+
+  it('cuando la nueva es mas fuerte, corta la anterior', () => {
+    const result = refineNotes([note(60, 40, 0, 1), note(62, 100, 0.4, 0.6)], {
+      instrumentId: 'alto_voice',
+      dropHarmonics: false,
+    });
+    expect(result.notes).toHaveLength(2);
+    expect(result.notes[0]?.offset).toBeCloseTo(0.4, 5);
+  });
+
+  it('se deduce del instrumento: la flauta si, el piano no', () => {
+    const overlapping = [note(60, 100, 0, 1), note(64, 90, 0.3, 0.8)];
+
+    expect(
+      refineNotes(overlapping, { instrumentId: 'flute', dropHarmonics: false }).notes,
+    ).toHaveLength(1);
+    // Un piano toca acordes: forzarle monofonia le robaria notas reales.
+    expect(
+      refineNotes(overlapping, { instrumentId: 'piano', dropHarmonics: false }).notes,
+    ).toHaveLength(2);
+  });
+
+  it('las cuerdas quedan fuera: hacen dobles cuerdas', () => {
+    const result = refineNotes([note(60, 100, 0, 1), note(67, 90, 0.3, 0.8)], {
+      instrumentId: 'violin',
+      dropHarmonics: false,
+    });
+    expect(result.notes).toHaveLength(2);
+  });
+
+  it('se puede forzar e imponer sobre el instrumento', () => {
+    const result = refineNotes([note(60, 100, 0, 1), note(64, 90, 0.3, 0.8)], {
+      instrumentId: 'piano',
+      monophonic: true,
+      dropHarmonics: false,
+    });
+    expect(result.notes).toHaveLength(1);
+  });
+
+  it('no toca las notas que se suceden sin solaparse', () => {
+    const result = refineNotes([note(60, 100, 0, 0.5), note(62, 90, 0.6, 0.5)], {
+      instrumentId: 'alto_voice',
+      dropHarmonics: false,
+    });
+    expect(result.notes).toHaveLength(2);
+  });
+});
+
 describe('refineNotes: confianza', () => {
   it('descarta por debajo del umbral', () => {
     const result = refineNotes([note(60, 90, 0, 0.5, 0.9), note(61, 90, 0, 0.5, 0.2)], {

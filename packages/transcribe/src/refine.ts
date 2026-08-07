@@ -37,8 +37,12 @@ export interface RefineOptions {
   readonly dropHarmonics?: boolean | undefined;
   /**
    * Cuanto mas debil tiene que ser un candidato para darlo por armonico.
-   * 0.85 significa que solo cae si no llega al 85% de la intensidad de su
-   * supuesta fundamental. Subirlo filtra mas y se come octavas reales.
+   *
+   * Subirlo filtra mas y empieza a comerse notas reales; bajarlo deja pasar
+   * armonicos. El valor tiene fundamento fisico: en un instrumento real los
+   * parciales suenan entre 10 y 20 dB por debajo de su fundamental, o sea
+   * entre el 10 % y el 30 % de su amplitud. Cualquier cosa que suene a mas de
+   * la mitad que la nota de abajo casi seguro que la toco alguien.
    */
   readonly harmonicRatio?: number | undefined;
   /** Ventana para considerar dos ataques simultaneos, en segundos. */
@@ -55,9 +59,20 @@ export interface RefineOptions {
   readonly mergeDuplicates?: boolean | undefined;
   /** Hueco maximo entre dos trozos de la misma altura para fundirlos. */
   readonly mergeGap?: number | undefined;
+  /**
+   * Forzar una sola nota a la vez.
+   *
+   * Si no se dice nada, se deduce del instrumento: una voz, una flauta o una
+   * trompeta emiten una linea y punto. Es una restriccion que el catalogo
+   * conoce y que ningun modelo de audio aplica, asi que un solo vocal
+   * transcrito sin ella sale con acordes imposibles alli donde el modelo dudo
+   * entre dos alturas.
+   */
+  readonly monophonic?: boolean | undefined;
 }
 
 export interface RefineReport {
+  readonly droppedOverlaps: number;
   readonly mergedDuplicates: number;
   readonly droppedHarmonics: number;
   readonly octaveCorrected: number;
@@ -73,7 +88,11 @@ export interface RefineResult {
 }
 
 const DEFAULTS = {
-  harmonicRatio: 0.85,
+  // Estaba en 0,85 y el banco de pruebas lo delato: con un bajo grave bajo una
+  // melodia, la melodia queda a distancia de doceava —intervalo real y de los
+  // mas comunes— y bastaba con que sonase algo mas floja que el bajo para que
+  // el filtro se la comiera. La precision de esa pieza cayo de 66,7 % a 59,3 %.
+  harmonicRatio: 0.55,
   onsetWindow: 0.06,
   minConfidence: 0,
   mergeGap: 0.05,
@@ -136,6 +155,27 @@ export function refineNotes(
   let octaveCorrected = 0;
   let droppedOutOfRange = 0;
   const instrument = options.instrumentId ? getInstrument(options.instrumentId) : undefined;
+
+  // ---- 3a. Desplazamiento sistematico de octava.
+  //
+  // La correccion nota a nota solo ve lo que cae FUERA del registro fisico, y
+  // ahi se le escapa el error mas dano hace: un bajo detectado entero una
+  // octava alta sigue estando dentro del rango de un bajo, asi que ninguna
+  // nota parece sospechosa por separado. Solo se nota mirando la pista entera
+  // contra la tesitura —el registro comodo, no el extremo— del instrumento.
+  if (instrument !== undefined && working.length >= 4) {
+    const shift = systematicOctaveShift(working, instrument);
+    if (shift !== 0) {
+      working = working.map((note) => ({ ...note, midi: note.midi + shift }));
+      explanations.push(
+        `Toda la pista estaba ${Math.abs(shift) / 12} octava(s) ` +
+          `${shift > 0 ? 'por debajo' : 'por encima'} de la tesitura de ${instrument.name}, y se ` +
+          'ha desplazado entera. Los detectores fallan la octava de forma sistematica en el ' +
+          'registro grave, donde la fundamental es debil y confunden un armonico con ella.',
+      );
+    }
+  }
+
   if (instrument) {
     const adjusted: RawNote[] = [];
     for (const note of working) {
@@ -164,9 +204,30 @@ export function refineNotes(
     }
   }
 
+  // ---- 4. Monofonia, si el instrumento no puede con dos notas a la vez.
+  //
+  // Va la ultima porque necesita que el resto ya este limpio: aplicarla antes
+  // de quitar los armonicos haria que un armonico fuerte desalojase a la nota
+  // real por el mero hecho de solaparse con ella.
+  let droppedOverlaps = 0;
+  const monophonic = options.monophonic ?? (instrument ? isMonophonic(instrument.family) : false);
+  if (monophonic) {
+    const single = collapseToOneVoice(working);
+    droppedOverlaps = working.length - single.length;
+    working = single;
+    if (droppedOverlaps > 0) {
+      explanations.push(
+        `${droppedOverlaps} notas descartadas por solaparse en un instrumento que solo puede ` +
+          `emitir una a la vez${instrument ? ` (${instrument.name})` : ''}. Se conservo la mas ` +
+          'fuerte de cada solape.',
+      );
+    }
+  }
+
   return {
     notes: working,
     report: {
+      droppedOverlaps,
       mergedDuplicates,
       droppedHarmonics,
       octaveCorrected,
@@ -178,6 +239,117 @@ export function refineNotes(
 }
 
 // --------------------------------------------------------------- interiores
+
+/**
+ * Ancho maximo de tesitura, en semitonos, para fiarse de su centro.
+ *
+ * Tres octavas. Por encima de eso el centro deja de significar nada: la
+ * tesitura de un piano abarca cinco, y una pieza escrita en clave de sol vive
+ * legitimamente muy por encima de su punto medio sin que eso indique ningun
+ * error. Este limite se puso despues de que el banco de pruebas mostrara la
+ * consecuencia de no tenerlo: los acordes de piano pasaron del 95,7 % al 0 %
+ * porque la pieza entera se desplazaba una octava hacia abajo.
+ */
+const NARROW_TESSITURA = 36;
+
+/**
+ * Cuantos semitonos hay que mover la pista entera para centrarla, o 0.
+ *
+ * Solo devuelve multiplos de doce y solo si la mejora es holgada: si el
+ * desplazamiento mejorase el encaje por poco, lo mas probable es que el
+ * instrumento declarado no sea exactamente el que suena, y mover la musica
+ * por esa sospecha seria peor que dejarla.
+ */
+function systematicOctaveShift(
+  notes: readonly RawNote[],
+  instrument: NonNullable<ReturnType<typeof getInstrument>>,
+): number {
+  const lowest = instrument.tessitura.lowest.midi;
+  const highest = instrument.tessitura.highest.midi;
+  if (highest - lowest > NARROW_TESSITURA) return 0;
+
+  const sorted = notes.map((note) => note.midi).sort((a, b) => a - b);
+  const median = sorted[Math.floor(sorted.length / 2)] ?? 60;
+
+  // Centro de la tesitura, no del rango fisico: el rango incluye extremos que
+  // casi nadie toca, y su centro esta mas alto de donde vive la musica.
+  const center = (lowest + highest) / 2;
+
+  const current = Math.abs(median - center);
+  let best = 0;
+  let bestDistance = current;
+  for (const shift of [12, -12, 24, -24]) {
+    const distance = Math.abs(median + shift - center);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      best = shift;
+    }
+  }
+
+  // Al menos una tercera menor de mejora. Empezo siendo media octava, por
+  // prudencia: desplazar la obra entera por una sospecha floja es de los
+  // errores mas caros que puede cometer esto. Se relajo al anadir el freno de
+  // tesitura ancha, que es el que de verdad evitaba el desastre —el piano
+  // desplazado— y hacia innecesario un margen tan grande.
+  return bestDistance + 3 < current ? best : 0;
+}
+
+/**
+ * Familias que solo pueden emitir una nota a la vez.
+ *
+ * Las cuerdas quedan fuera aunque suelan tocar una linea: un violin hace
+ * dobles cuerdas y un violonchelo acordes de tres, asi que forzarles monofonia
+ * les robaria notas reales.
+ */
+function isMonophonic(family: string): boolean {
+  return family === 'voice' || family === 'woodwind' || family === 'brass';
+}
+
+/**
+ * Si ese instrumento del catalogo solo puede con una nota a la vez.
+ *
+ * Lo usa tambien el ensamblador de la partitura: no basta con imponer
+ * monofonia sobre los tiempos medidos, porque al cuantizar se redondean los
+ * finales y vuelven a aparecer solapes de un paso de rejilla. La restriccion
+ * tiene que viajar hasta el reparto de voces.
+ */
+export function isMonophonicInstrument(instrumentId: string): boolean {
+  const instrument = getInstrument(instrumentId);
+  return instrument ? isMonophonic(instrument.family) : false;
+}
+
+/**
+ * Deja una sola nota sonando en cada instante, quedandose con la mas fuerte.
+ *
+ * Cuando el modelo duda entre dos alturas cercanas emite las dos solapadas.
+ * En un instrumento polifonico eso puede ser un acorde legitimo; en una voz
+ * es siempre una de las dos, y la intensidad es la mejor pista de cual.
+ */
+function collapseToOneVoice(notes: readonly RawNote[]): RawNote[] {
+  const ordered = [...notes].sort((a, b) => a.onset - b.onset || b.velocity - a.velocity);
+  const kept: RawNote[] = [];
+
+  for (const note of ordered) {
+    const previous = kept[kept.length - 1];
+    if (previous === undefined || note.onset >= previous.offset) {
+      kept.push(note);
+      continue;
+    }
+
+    if (note.velocity > previous.velocity) {
+      // La nueva manda: la anterior se corta donde entra esta. Si al cortarla
+      // no queda nada audible, desaparece.
+      const trimmed = { ...previous, offset: note.onset };
+      if (trimmed.offset - trimmed.onset > 0.03) kept[kept.length - 1] = trimmed;
+      else kept.pop();
+      kept.push(note);
+    }
+    // Si la nueva es mas floja, se descarta entera: recortarle el ataque la
+    // dejaria empezando en un sitio donde nadie ataco nada.
+  }
+
+  return kept;
+}
 
 /**
  * Funde los trozos consecutivos de una misma nota.
