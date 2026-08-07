@@ -90,6 +90,7 @@ def describe() -> dict[str, Any]:
                 {"basic_pitch": "basic-pitch", "soundfile": "soundfile"},
                 "notes",
             ).to_dict(),
+            _capability("fetch", {"yt_dlp": "yt-dlp"}, "fetch").to_dict(),
         ],
     }
 

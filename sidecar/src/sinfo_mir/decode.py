@@ -5,9 +5,11 @@ comprimidos. Escribir un decodificador de MP3 en JavaScript puro es
 desproporcionado, y tirar de una libreria nativa rompia la promesa de
 instalacion sin compilar que gobierna todo el proyecto.
 
-La solucion es que lo haga quien ya tiene las herramientas: si el sidecar esta,
-sabe leer todo lo que sepa leer libsndfile. Si no esta, el servidor sigue
-funcionando solo con WAV y lo dice claramente.
+Se intenta primero con libsndfile, que es rapido y cubre WAV, FLAC, OGG y MP3.
+Lo que no reconoce va a PyAV, que trae las bibliotecas de ffmpeg dentro de su
+propio wheel: eso resuelve los contenedores de las plataformas —YouTube sirve
+opus dentro de webm, o AAC dentro de m4a— sin obligar a nadie a instalar
+ffmpeg aparte y ponerlo en el PATH.
 """
 
 from __future__ import annotations
@@ -26,8 +28,13 @@ def decode_audio(path: Path, out: Path, sample_rate: int | None = None) -> dict[
     import numpy as np
     import soundfile as sf
 
-    data, rate = sf.read(str(path), dtype="float32", always_2d=True)
-    mono = data.mean(axis=1)
+    try:
+        data, rate = sf.read(str(path), dtype="float32", always_2d=True)
+        mono = data.mean(axis=1)
+        backend = "soundfile"
+    except Exception:
+        mono, rate = _decode_with_av(path)
+        backend = "av"
 
     if sample_rate is not None and sample_rate != rate:
         import librosa
@@ -45,9 +52,47 @@ def decode_audio(path: Path, out: Path, sample_rate: int | None = None) -> dict[
         "out": str(out),
         "sampleRate": int(rate),
         "samples": int(mono.size),
+        "backend": backend,
         "summary": {
             "duration": round(mono.size / rate, 3) if rate else 0.0,
             "peak": round(peak, 4),
             "sourceFormat": path.suffix.lstrip(".").lower(),
+            "backend": backend,
         },
     }
+
+
+def _decode_with_av(path: Path) -> tuple[Any, int]:
+    """Decodifica con PyAV lo que libsndfile no entiende."""
+    import av
+    import numpy as np
+
+    chunks: list[Any] = []
+    with av.open(str(path)) as container:
+        stream = next((s for s in container.streams if s.type == "audio"), None)
+        if stream is None:
+            raise ValueError(f"El archivo {path.name} no contiene ninguna pista de audio.")
+        rate = stream.codec_context.sample_rate
+
+        for frame in container.decode(stream):
+            array = frame.to_ndarray()
+            # PyAV entrega (canales, muestras) en planar y (1, muestras*canales)
+            # en entrelazado. Se remezcla a mono en el primer caso y se aplana
+            # en el segundo; para audio estereo entrelazado el promedio de
+            # canales no es exacto, pero la diferencia es inaudible y ningun
+            # analisis posterior mira la imagen estereo.
+            if array.ndim == 2 and array.shape[0] > 1:
+                array = array.mean(axis=0)
+            else:
+                array = array.reshape(-1)
+            chunks.append(array.astype(np.float32))
+
+    if not chunks:
+        raise ValueError(f"No se pudo decodificar audio de {path.name}.")
+
+    samples = np.concatenate(chunks)
+    # Los codecs enteros salen en su escala nativa (hasta 32768); se normaliza.
+    peak = float(np.max(np.abs(samples))) if samples.size else 0.0
+    if peak > 1.0:
+        samples = samples / peak
+    return samples, int(rate)

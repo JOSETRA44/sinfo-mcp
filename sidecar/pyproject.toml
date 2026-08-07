@@ -30,6 +30,11 @@ separate = ["demucs>=4.0", "torch>=2.0", "soundfile>=0.12"]
 # correcta y revienta al primer uso con un ModuleNotFoundError desconcertante.
 notes = ["basic-pitch>=0.4", "soundfile>=0.12", "setuptools>=68,<81"]
 
+# Descarga de audio desde una URL. Va en su propio extra a proposito: es la
+# unica capacidad con implicaciones legales, y no debe entrar de rebote al
+# instalar las demas.
+fetch = ["yt-dlp>=2024.1"]
+
 all = ["sinfo-mir[beats,separate,notes]"]
 
 [project.scripts]

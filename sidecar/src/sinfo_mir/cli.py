@@ -88,6 +88,13 @@ def _cmd_decode(args: argparse.Namespace) -> dict[str, Any]:
     return decode_audio(path, Path(args.out), args.sample_rate)
 
 
+def _cmd_fetch(args: argparse.Namespace) -> dict[str, Any]:
+    _require("fetch")
+    from .fetch import fetch_audio
+
+    return fetch_audio(args.url, Path(args.out))
+
+
 def _cmd_beats(args: argparse.Namespace) -> dict[str, Any]:
     _require("beats")
     from .beats import track_beats
@@ -111,7 +118,12 @@ def _cmd_notes(args: argparse.Namespace) -> dict[str, Any]:
     from .notes import transcribe
 
     path = _input_path(args.input)
-    result = transcribe(path, instrument=args.instrument)
+    result = transcribe(
+        path,
+        instrument=args.instrument,
+        minimum_frequency=args.min_freq,
+        maximum_frequency=args.max_freq,
+    )
     return _write_result(args.out, result)
 
 
@@ -127,6 +139,11 @@ def build_parser() -> argparse.ArgumentParser:
         "describe", help="Que modelos hay instalados y que falta. Nunca falla."
     )
     described.set_defaults(handler=_cmd_describe)
+
+    fetch = subcommands.add_parser("fetch", help="Descarga el audio de una URL.")
+    fetch.add_argument("--url", required=True)
+    fetch.add_argument("--out", required=True, help="Carpeta de destino.")
+    fetch.set_defaults(handler=_cmd_fetch)
 
     decode = subcommands.add_parser(
         "decode", help="Convierte cualquier formato de audio en un WAV mono."
@@ -155,6 +172,11 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Instrumento declarado. Acota el registro y evita errores de octava.",
     )
+    # Acotar el rango de busqueda DENTRO del modelo es mucho mejor que corregir
+    # despues: una octava mal detectada que cae dentro del rango fisico del
+    # instrumento ya no se puede distinguir de una nota buena a posteriori.
+    notes.add_argument("--min-freq", type=float, default=None, dest="min_freq")
+    notes.add_argument("--max-freq", type=float, default=None, dest="max_freq")
     notes.set_defaults(handler=_cmd_notes)
 
     return parser
