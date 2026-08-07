@@ -66,9 +66,21 @@ Dos argumentos cambian el resultado más que ningún otro:
 - **`bpm`** — el audio no trae mapa de tempo. Sin sidecar y sin este dato hay que suponer 120, y el ritmo sale mal salvo casualidad. Si el usuario no lo sabe, que lo cuente con un metrónomo.
 - **`instrumentId`** — acota la búsqueda al registro real de ese instrumento. Es la mejor defensa contra los errores de octava, el fallo más común de cualquier transcriptor.
 
-Solo WAV sin comprimir. MP3 y OGG hay que convertirlos antes: un decodificador de formatos comprimidos sería una dependencia nativa, y este servidor las evita a propósito.
+**Formatos.** Sin sidecar, solo WAV. Con sidecar, casi cualquier cosa: MP3, FLAC, M4A, OGG, y los contenedores de las plataformas.
+
+**Enlaces.** `import_audio` acepta una URL, pero está **desactivado por defecto** y se habilita con `SINFO_ALLOW_URL=1`. Si el usuario pide transcribir un enlace y sale desactivado, explícale que descargar de plataformas como YouTube incumple sus condiciones de servicio y que activarlo es decisión suya — no lo presentes como un fallo de configuración que hay que corregir.
 
 Los resultados caros se cachean por **contenido** del archivo, así que reintentar sobre el mismo audio es instantáneo — y renombrarlo no engaña a la caché.
+
+### Canciones con varios instrumentos
+
+**Si el audio es una canción, pon `separateStems: true`.** Sin eso, voz, bajo y teclado acaban amontonados en una sola parte de cinco o seis voces que no representa a ningún instrumento y no hay quien la lea. Con eso, cada línea va a su parte con su instrumento declarado — y por tanto con su registro para corregir octavas.
+
+Tarda del orden de la duración de la obra, pero se cachea: reintentar es instantáneo.
+
+La **batería se omite** a propósito: las alturas de la percusión no significan nada y escribirlas produce una parte que parece música sin serlo. Su ritmo ya está en el pulso detectado.
+
+No pases `instrumentId` junto con `separateStems`: lo impondría a todas las pistas. Sin él, cada una recibe el suyo, y la voz además se clasifica por el registro que de verdad canta.
 
 ### Depuración con criterio musical
 
